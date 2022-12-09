@@ -225,14 +225,15 @@ interface IBEP20 {
 
     function balanceOf(address account) external view returns (uint256);
 
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool);
+    function transfer(
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
 
-    function allowance(address _owner, address spender)
-        external
-        view
-        returns (uint256);
+    function allowance(
+        address _owner,
+        address spender
+    ) external view returns (uint256);
 
     function approve(address spender, uint256 amount) external returns (bool);
 
@@ -276,10 +277,10 @@ library Address {
         );
     }
 
-    function functionCall(address target, bytes memory data)
-        internal
-        returns (bytes memory)
-    {
+    function functionCall(
+        address target,
+        bytes memory data
+    ) internal returns (bytes memory) {
         return functionCall(target, data, 'Address: low-level call failed');
     }
 
@@ -322,11 +323,10 @@ library Address {
         return _verifyCallResult(success, returndata, errorMessage);
     }
 
-    function functionStaticCall(address target, bytes memory data)
-        internal
-        view
-        returns (bytes memory)
-    {
+    function functionStaticCall(
+        address target,
+        bytes memory data
+    ) internal view returns (bytes memory) {
         return
             functionStaticCall(
                 target,
@@ -345,10 +345,10 @@ library Address {
         return _verifyCallResult(success, returndata, errorMessage);
     }
 
-    function functionDelegateCall(address target, bytes memory data)
-        internal
-        returns (bytes memory)
-    {
+    function functionDelegateCall(
+        address target,
+        bytes memory data
+    ) internal returns (bytes memory) {
         return
             functionDelegateCall(
                 target,
@@ -390,11 +390,7 @@ library Address {
 library SafeBEP20 {
     using Address for address;
 
-    function safeTransfer(
-        IBEP20 token,
-        address to,
-        uint256 value
-    ) internal {
+    function safeTransfer(IBEP20 token, address to, uint256 value) internal {
         _callOptionalReturn(
             token,
             abi.encodeWithSelector(token.transfer.selector, to, value)
@@ -503,8 +499,6 @@ library SafeBEP20 {
 }
 
 contract Staking is Ownable {
-    // TODO Use "90 days" instead of "3 minutes" for quarterlypayout on mainnet
-    // in the function `claimQuarterlyPayout`
     using SafeBEP20 for IBEP20;
     using SafeMath for uint256;
 
@@ -535,9 +529,9 @@ contract Staking is Ownable {
 
     struct DepositLimiters {
         uint256 duration;
-        uint256 startTime; // >>Deposits<< Start Time
-        uint256 endTime; // >>Deposits<< End Time
-        uint256 limitPerUser;
+        uint256 startTime; // Deposits Start Time
+        uint256 endTime; // Deposits End Time
+        uint256 limitPerUser; // Limit Per Deposit Transaction
         uint256 capacity;
         uint256 maxUtilisation;
     }
@@ -550,7 +544,7 @@ contract Staking is Ownable {
     struct PoolInfo {
         string poolName;
         PoolType poolType;
-        uint256 APY;
+        uint256 APY; // "Max. APY" in case of poolType Loan
         bool paused;
         bool quarterlyPayout;
         uint256 uniqueUsers;
@@ -598,7 +592,7 @@ contract Staking is Ownable {
             require(
                 block.timestamp >= pool.depositLimiters.startTime &&
                     block.timestamp <= pool.depositLimiters.endTime,
-                'deposits disabled at this time'
+                'deposits not started at this time'
             );
         }
         require(
@@ -624,22 +618,102 @@ contract Staking is Ownable {
                 paidOut: 0
             })
         );
-
-        pool.tokenInfo.collateralToken.mint(msg.sender, _amount);
-
         totalUserAmountStaked[_pid][msg.sender] = totalUserAmountStaked[_pid][
             msg.sender
         ].add(_amount);
 
         pool.funds.balance = pool.funds.balance.add(_amount);
 
-        if (!isAPoolUser[_pid][msg.sender]) {
-            pool.uniqueUsers = pool.uniqueUsers.add(1);
-        }
+        addUniqueUser(_pid);
 
-        isAPoolUser[_pid][msg.sender] = true;
+        pool.tokenInfo.collateralToken.mint(msg.sender, _amount);
 
         emit Deposited(msg.sender, _pid, _amount);
+    }
+
+    function withdraw(uint256 _pid, uint256 _index, uint256 _amount) public {
+        PoolInfo storage pool = poolInfoPrivate[_pid];
+        UserInfo storage transaction = userInfo[_pid][msg.sender][_index];
+
+        if (
+            pool.poolType == PoolType.Staking &&
+            block.timestamp < pool.depositLimiters.endTime
+        ) {
+            emergencyWithdraw(_pid, _index, _amount);
+            return;
+        }
+
+        require(
+            transaction.transactionType == TransactionType.Staking,
+            'not staked'
+        );
+        require(_amount <= transaction.amount, 'amount greater than available');
+
+        if (pool.poolType == PoolType.Staking) {
+            // Check if the user is withdrawing early
+            require(
+                block.timestamp >=
+                    pool.depositLimiters.endTime +
+                        pool.depositLimiters.duration,
+                'withdrawing too early'
+            );
+        } else {
+            require(
+                pool.funds.balance >= pool.funds.loanedBalance.add(_amount),
+                'amount is currently utilised'
+            );
+
+            (
+                uint256 projectedUtilisation,
+                uint256 precision
+            ) = calculatePercentage(
+                    pool.funds.loanedBalance,
+                    pool.funds.balance.sub(_amount)
+                );
+
+            require(
+                projectedUtilisation <=
+                    pool.depositLimiters.maxUtilisation.mul(precision),
+                'pool utilisation will max out if withdrawn'
+            );
+        }
+
+        // Update user states
+        transaction.amount = transaction.amount.sub(_amount);
+        transaction.time = block.timestamp;
+        totalUserAmountStaked[_pid][msg.sender] = totalUserAmountStaked[_pid][
+            msg.sender
+        ].sub(_amount);
+
+        uint256 _originalAmount = _amount;
+
+        if (pool.poolType == PoolType.Staking) {
+            // Send rewards according to APY
+            uint256 _duration = block.timestamp.sub(
+                pool.depositLimiters.endTime
+            );
+
+            if(_duration > pool.depositLimiters.duration) {
+                _duration = pool.depositLimiters.duration;
+            }
+
+            transferRewards(_pid, _index, _amount, _duration);
+        } else if (pool.poolType == PoolType.Loan) {
+            // Add rewards to _amount with the ratio according to current interest paid
+            _amount = _amount.mul(pool.funds.balance).div(
+                pool.tokenInfo.collateralToken.totalSupply()
+            );
+        }
+
+        // Update global states
+        pool.funds.balance = pool.funds.balance.sub(_amount);
+
+        deleteStakeIfEmpty(_pid, _index);
+
+        pool.tokenInfo.collateralToken.burn(msg.sender, _originalAmount);
+        pool.tokenInfo.token.safeTransfer(msg.sender, _amount);
+
+        emit Withdrawn(msg.sender, _pid, _amount);
     }
 
     function emergencyWithdraw(
@@ -648,160 +722,108 @@ contract Staking is Ownable {
         uint256 _amount
     ) public {
         PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo[] storage transaction = userInfo[_pid][msg.sender];
+        UserInfo storage transaction = userInfo[_pid][msg.sender][_index];
+
+        require(_amount <= transaction.amount, 'Amount greater than deposited');
+        
+        // Update user states
+        transaction.amount = transaction.amount.sub(_amount);
+        transaction.time = block.timestamp;
+        totalUserAmountStaked[_pid][msg.sender] = totalUserAmountStaked[_pid][
+            msg.sender
+        ].sub(_amount);
+
+        // Update global states
+        pool.funds.balance = pool.funds.balance.sub(_amount);
+
+        deleteStakeIfEmpty(_pid, _index);
 
         pool.tokenInfo.collateralToken.burn(msg.sender, _amount);
         pool.tokenInfo.token.safeTransfer(msg.sender, _amount);
 
-        transaction[_index].amount = transaction[_index].amount.sub(_amount);
-        transaction[_index].time = block.timestamp;
-
         emit EmergencyWithdraw(msg.sender, _pid, _amount);
     }
 
-    function deleteStakeIfEmpty(uint256 _pid, uint256 _index) internal {
+    function deleteStakeIfEmpty(uint256 _pid, uint256 _index) private {
         PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo[] storage transaction = userInfo[_pid][msg.sender];
+        UserInfo[] storage transactions = userInfo[_pid][msg.sender];
 
-        if (transaction[_index].amount == 0) {
-            transaction[_index] = transaction[transaction.length - 1];
-            transaction.pop();
+        if (transactions[_index].amount == 0) {
+            transactions[_index] = transactions[transactions.length - 1];
+            transactions.pop();
         }
 
-        if (transaction.length == 0) {
+        if (transactions.length == 0) {
             isAPoolUser[_pid][msg.sender] = false;
             pool.uniqueUsers = pool.uniqueUsers.sub(1);
         }
     }
 
-    function calculatePercentage(uint256 _value, uint256 _of)
-        internal
-        pure
-        returns (uint256)
-    {
-        if (_of == 0) return 0;
+    function addUniqueUser(uint256 _pid) private {
+        PoolInfo storage pool = poolInfoPrivate[_pid];
 
-        uint256 percentage = _value.mul(100).div(_of);
+        if (!isAPoolUser[_pid][msg.sender]) {
+            pool.uniqueUsers = pool.uniqueUsers.add(1);
+        }
 
-        return percentage;
+        isAPoolUser[_pid][msg.sender] = true;
     }
 
-    function withdraw(
-        uint256 _pid,
-        uint256 _index,
-        uint256 _amount
-    ) public {
-        PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo[] storage transaction = userInfo[_pid][msg.sender];
+    function calculatePercentage(
+        uint256 _value,
+        uint256 _of
+    ) public pure returns (uint256, uint256) {
+        uint256 precision = 1 ether;
 
-        if (block.timestamp < pool.depositLimiters.endTime) {
-            emergencyWithdraw(_pid, _index, _amount);
-            return;
-        }
+        // Special condition for division by zero
+        if (_of == 0) return (0, precision); 
 
-        require(
-            transaction[_index].transactionType == TransactionType.Staking,
-            'not staked'
-        );
-        require(
-            _amount <= transaction[_index].amount,
-            'amount greater than transaction'
-        );
+        uint256 percentage = _value.mul(100).mul(precision).div(_of);
 
-        if (pool.poolType == PoolType.Staking) {
-            require(
-                block.timestamp >=
-                    pool.depositLimiters.endTime + pool.depositLimiters.duration,
-                'withdrawing too early'
-            );
-        } else {
-            require(
-                pool.funds.balance >= pool.funds.loanedBalance.add(_amount),
-                'high utilisation'
-            );
-
-            uint256 projectedUtilisation = calculatePercentage(
-                pool.funds.loanedBalance,
-                pool.funds.balance.sub(_amount)
-            );
-
-            require(
-                projectedUtilisation < pool.depositLimiters.maxUtilisation,
-                'utilisation maxed out'
-            );
-        }
-
-        transferRewards(
-            _pid,
-            _index,
-            block.timestamp - pool.depositLimiters.endTime,
-            _amount
-        );
-
-        pool.tokenInfo.collateralToken.burn(msg.sender, _amount);
-        pool.tokenInfo.token.safeTransfer(msg.sender, _amount);
-
-        transaction[_index].amount = transaction[_index].amount.sub(_amount);
-        transaction[_index].time = block.timestamp;
-
-        totalUserAmountStaked[_pid][msg.sender] = totalUserAmountStaked[_pid][
-            msg.sender
-        ].sub(_amount);
-
-        pool.funds.balance = pool.funds.balance.sub(_amount);
-        // .sub(rewards) ?
-
-        emit Withdrawn(msg.sender, _pid, _amount);
-
-        deleteStakeIfEmpty(_pid, _index);
+        return (percentage, precision);
     }
 
     function transferRewards(
         uint256 _pid,
         uint256 _index,
-        uint256 _duration,
-        uint256 _amount
+        uint256 _amount,
+        uint256 _duration
     ) private returns (uint256 claimedRewards) {
-        PoolInfo memory pool = poolInfoPrivate[_pid];
-        UserInfo[] storage transaction = userInfo[_pid][msg.sender];
+        PoolInfo storage pool = poolInfoPrivate[_pid];
+        UserInfo storage transaction = userInfo[_pid][msg.sender][_index];
 
-        if (pool.poolType == PoolType.Staking) {
-            if (_duration > pool.depositLimiters.duration) {
-                _duration = pool.depositLimiters.duration;
-            }
-        }
-
-        require(
-            _amount <= transaction[_index].amount,
-            'Amount greater than transaction'
+        require(_amount <= transaction.amount, 'amount greater than available');
+        
+        // Calculate rewards according to APY
+        uint256 reward = calculateInterest(
+            msg.sender,
+            _pid,
+            _index,
+            _amount,
+            _duration
         );
 
-        uint256 reward = calculateInterest(msg.sender, _pid, _index, _amount);
-
-        uint256 claimableRewards;
-
-        if (reward > transaction[_index].paidOut) { 
-            claimableRewards = reward.sub(transaction[_index].paidOut);
+        if (reward > transaction.paidOut) {
+            reward = reward.sub(transaction.paidOut);
         } else {
-            claimableRewards = 0;
+            reward = uint256(0);
         }
 
-        pool.tokenInfo.token.safeTransfer(msg.sender, claimableRewards);
+        transaction.paidOut = transaction.paidOut.add(reward);
+        pool.funds.balance = pool.funds.balance.sub(reward);
 
-        transaction[_index].paidOut = transaction[_index].paidOut.add(
-            claimableRewards
-        );
+        pool.tokenInfo.token.safeTransfer(msg.sender, reward);
 
-        emit RewardHarvested(msg.sender, _pid, claimableRewards);
+        emit RewardHarvested(msg.sender, _pid, reward);
 
-        return claimableRewards;
+        return reward;
     }
 
     function borrow(uint256 _pid, uint256 _amount) public {
         require(isWhitelisted[_pid][msg.sender], 'Only whitelisted can borrow');
 
         PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo[] storage loans = userInfo[_pid][msg.sender];
+        UserInfo[] storage transactions = userInfo[_pid][msg.sender];
 
         require(pool.poolType == PoolType.Loan, 'no loans from here');
 
@@ -809,19 +831,20 @@ contract Staking is Ownable {
 
         require(pool.funds.balance > 0, 'Nothing deposited');
 
-        uint256 projectedUtilisation = calculatePercentage(
+        (uint256 projectedUtilisation, uint256 precision) = calculatePercentage(
             pool.funds.loanedBalance.add(_amount),
             pool.funds.balance
         );
 
         require(
-            projectedUtilisation < pool.depositLimiters.maxUtilisation,
+            projectedUtilisation <=
+                pool.depositLimiters.maxUtilisation.mul(precision),
             'utilisation maxed out'
         );
 
         pool.tokenInfo.token.safeTransfer(msg.sender, _amount);
 
-        loans.push(
+        transactions.push(
             UserInfo({
                 transactionType: TransactionType.Borrow,
                 amount: _amount,
@@ -836,34 +859,43 @@ contract Staking is Ownable {
 
         pool.funds.loanedBalance = pool.funds.loanedBalance.add(_amount);
 
-        if (!isAPoolUser[_pid][msg.sender]) {
-            pool.uniqueUsers = pool.uniqueUsers.add(1);
-        }
-
-        isAPoolUser[_pid][msg.sender] = true;
+        addUniqueUser(_pid);
 
         emit Borrowed(msg.sender, _pid, _amount);
     }
 
-    function repay(
-        uint256 _pid,
-        uint256 _index,
-        uint256 _amount
-    ) public {
+    function repay(uint256 _pid, uint256 _index, uint256 _amount) public {
         PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo[] storage transaction = userInfo[_pid][msg.sender];
+        UserInfo storage transaction = userInfo[_pid][msg.sender][_index];
 
         require(pool.poolType == PoolType.Loan, 'nothing borrowed from here');
-
         require(
-            transaction[_index].transactionType == TransactionType.Borrow,
+            transaction.transactionType == TransactionType.Borrow,
             'not borrowed'
         );
+        require(_amount <= transaction.amount, 'amount greater than borrowed');
 
-        require(
-            _amount <= transaction[_index].amount,
-            'amount greater than borrowed'
+        uint256 _duration = block.timestamp.sub(transaction.time);
+
+        // Calculate interest according to APY
+        uint256 interest = calculateInterest(
+            msg.sender,
+            _pid,
+            _index,
+            _amount,
+            _duration
         );
+
+        pool.funds.balance = pool.funds.balance.add(interest);
+
+        transaction.amount = transaction.amount.sub(_amount);
+        transaction.time = block.timestamp;
+
+        totalUserAmountBorrowed[_pid][msg.sender] = totalUserAmountBorrowed[
+            _pid
+        ][msg.sender].sub(_amount);
+
+        pool.funds.loanedBalance = pool.funds.loanedBalance.sub(_amount);
 
         pool.tokenInfo.token.safeTransferFrom(
             msg.sender,
@@ -871,22 +903,11 @@ contract Staking is Ownable {
             _amount
         );
 
-        uint256 interest = calculateInterest(msg.sender, _pid, _index, _amount);
-
         pool.tokenInfo.token.safeTransferFrom(
             msg.sender,
             address(this),
             interest
         );
-
-        transaction[_index].amount = transaction[_index].amount.sub(_amount);
-        transaction[_index].time = block.timestamp;
-
-        totalUserAmountBorrowed[_pid][msg.sender] = totalUserAmountBorrowed[
-            _pid
-        ][msg.sender].sub(_amount);
-
-        pool.funds.loanedBalance = pool.funds.loanedBalance.sub(_amount);
 
         emit Repaid(msg.sender, _pid, _amount);
 
@@ -897,88 +918,74 @@ contract Staking is Ownable {
         address _user,
         uint256 _pid,
         uint256 _index,
-        uint256 _amount
+        uint256 _amount,
+        uint256 _duration
     ) public view returns (uint256) {
         PoolInfo memory pool = poolInfoPrivate[_pid];
-        UserInfo[] memory transaction = userInfo[_pid][_user];
+        UserInfo memory transaction = userInfo[_pid][_user][_index];
 
-        require(
-            _amount <= transaction[_index].amount,
-            'Amount greater than transaction'
-        );
+        require(_amount <= transaction.amount, 'amount greater than available');
 
         if (pool.poolType == PoolType.Staking) {
             if (block.timestamp < pool.depositLimiters.endTime) {
+                // No pay outs earlier than deposits end time for poolType Staking
                 return 0;
             }
         }
 
-        uint256 utilisation;
+        (uint256 utilisation, uint256 precision) = getPoolUtilisation(_pid);
 
-        if (pool.poolType == PoolType.Loan) {
-            utilisation = getPoolUtilisation(_pid);
-        } else {
-            utilisation = 100; // => Ignore
+        if (pool.poolType == PoolType.Staking) {
+            // Ignore Utilisation for PoolType Staking (use 100%)
+            utilisation = uint256(100).mul(precision); 
         }
 
-        uint256 rewardCalculationStartTime = pool.poolType == PoolType.Loan
-            ? transaction[_index].time
-            : pool.depositLimiters.endTime;
-
+        // Context: APY is dependent on utilisation for poolType Loan. Max APY is reached on 100% utilisation
         return
-            (
-                _amount.mul(pool.APY).mul(utilisation).mul(
-                    block.timestamp.sub(rewardCalculationStartTime)
+            (_amount.mul(pool.APY).mul(utilisation).mul(_duration)).div(
+                uint256(100).mul(uint256(100)).mul(uint256(365 days)).mul(
+                    precision
                 )
-            ).div(100 * 100 * 365 days);
+            );
     }
 
-    function getPoolUtilisation(uint256 _pid) public view returns (uint256) {
+    function getPoolUtilisation(
+        uint256 _pid
+    ) public view returns (uint256, uint256) {
         PoolInfo memory pool = poolInfoPrivate[_pid];
 
-        if (pool.funds.balance == 0) {
-            return 0;
-        }
-
-        uint256 utilisation = calculatePercentage(
+        (uint256 utilisation, uint256 precision) = calculatePercentage(
             pool.funds.loanedBalance,
             pool.funds.balance
         );
 
-        if (utilisation > 100) {
-            utilisation = 100;
-        }
-
-        return (utilisation);
+        return (utilisation, precision);
     }
 
     function claimQuarterlyPayout(uint256 _pid, uint256 _index) external {
         PoolInfo memory pool = poolInfoPrivate[_pid];
-        UserInfo[] memory transaction = userInfo[_pid][msg.sender];
+        UserInfo memory transaction = userInfo[_pid][msg.sender][_index];
 
-        require(pool.quarterlyPayout, 'quarterlyPayout disabled for pool');
-        require(pool.poolType == PoolType.Staking, 'poolType not Staking');
         require(
-            block.timestamp > pool.depositLimiters.endTime,
-            'not started'
+            pool.poolType == PoolType.Staking,
+            'quarterlyPayout not valid for poolType Staking'
         );
+        require(pool.quarterlyPayout, 'quarterlyPayout disabled for pool');
+        require(block.timestamp > pool.depositLimiters.endTime, 'not started');
 
-        uint256 timeDiff = block.timestamp - pool.depositLimiters.endTime;
+        uint256 _duration = block.timestamp - pool.depositLimiters.endTime;
 
-        timeDiff = timeDiff > pool.depositLimiters.duration
-            ? pool.depositLimiters.duration
-            : timeDiff;
+        if(_duration > pool.depositLimiters.duration) {
+            _duration = pool.depositLimiters.duration;
+        }
 
-        uint256 quartersPassed = (timeDiff).div(3 minutes);
+        uint256 quartersPassed = (_duration).div(90 days);
 
         require(quartersPassed > 0, 'too early');
 
-        transferRewards(
-            _pid,
-            _index,
-            quartersPassed.mul(3 minutes),
-            transaction[_index].amount
-        );
+        _duration = quartersPassed.mul(90 days);
+
+        transferRewards(_pid, _index, transaction.amount, _duration);
     }
 
     function whitelist(
@@ -995,29 +1002,37 @@ contract Staking is Ownable {
         emit Whitelisted(_user, _pid, _status);
     }
 
-    function createPool(PoolInfo memory _poolInfo, PoolType _poolType)
-        external
-        onlyOwner
-    {
-        if (_poolType != PoolType.Loan) {
+    function createPool(
+        PoolInfo memory _poolInfo,
+        PoolType _poolType
+    ) external onlyOwner {
+        if (_poolInfo.poolType == PoolType.Staking) {
             require(
                 _poolInfo.depositLimiters.startTime <
                     _poolInfo.depositLimiters.endTime,
                 'end time should be after start time'
             );
+        } else {
+            _poolInfo.depositLimiters.startTime = 0;
+            _poolInfo.depositLimiters.endTime = 0;
         }
 
         _poolInfo.funds.balance = 0;
         _poolInfo.funds.loanedBalance = 0;
         _poolInfo.uniqueUsers = 0;
 
+        require(
+            _poolInfo.depositLimiters.maxUtilisation <= 100,
+            'Utilisation can be maximum 100%'
+        );
+
         poolInfoPrivate.push(_poolInfo);
     }
 
-    function editPool(uint256 _pid, PoolInfo memory _newPoolInfo)
-        external
-        onlyOwner
-    {
+    function editPool(
+        uint256 _pid,
+        PoolInfo memory _newPoolInfo
+    ) external onlyOwner {
         PoolInfo memory pool = poolInfoPrivate[_pid];
 
         // Perserve some info
@@ -1025,16 +1040,33 @@ contract Staking is Ownable {
         _newPoolInfo.funds.loanedBalance = pool.funds.loanedBalance;
         _newPoolInfo.uniqueUsers = pool.uniqueUsers;
         _newPoolInfo.tokenInfo.token = pool.tokenInfo.token;
+        _newPoolInfo.tokenInfo.collateralToken = pool.tokenInfo.collateralToken;
+        _newPoolInfo.poolType = pool.poolType;
+
+        // Check utilisation
+        require(
+            _newPoolInfo.depositLimiters.maxUtilisation <= 100,
+            'utilisation should be max. 100%'
+        );
+        
+        (uint256 currentUtilisation, uint256 precision) = getPoolUtilisation(
+            _pid
+        );
+
+        require(
+            _newPoolInfo.depositLimiters.maxUtilisation.mul(precision) >=
+                currentUtilisation,
+            'should not set maxUtilisation less than current utilisation'
+        );
 
         // Assign new values
         poolInfoPrivate[_pid] = _newPoolInfo;
     }
 
-    function getPoolInfo(uint256 _from, uint256 _to)
-        external
-        view
-        returns (PoolInfo[] memory)
-    {
+    function getPoolInfo(
+        uint256 _from,
+        uint256 _to
+    ) external view returns (PoolInfo[] memory) {
         PoolInfo[] memory tPoolInfo = new PoolInfo[](_to - _from + 1);
 
         uint256 j = 0;
@@ -1054,11 +1086,10 @@ contract Staking is Ownable {
         return tPoolInfo;
     }
 
-    function totalStakesOfUser(uint256 _pid, address _user)
-        external
-        view
-        returns (uint256)
-    {
+    function totalStakesOfUser(
+        uint256 _pid,
+        address _user
+    ) external view returns (uint256) {
         return userInfo[_pid][_user].length;
     }
 
