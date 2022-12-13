@@ -19,7 +19,11 @@ interface IERC20 {
      * @dev Emitted when the allowance of a `spender` for an `owner` is set by
      * a call to {approve}. `value` is the new allowance.
      */
-    event Approval(address indexed owner, address indexed spender, uint256 value);
+    event Approval(
+        address indexed owner,
+        address indexed spender,
+        uint256 value
+    );
 
     /**
      * @dev Returns the amount of tokens in existence.
@@ -47,7 +51,10 @@ interface IERC20 {
      *
      * This value changes when {approve} or {transferFrom} are called.
      */
-    function allowance(address owner, address spender) external view returns (uint256);
+    function allowance(
+        address owner,
+        address spender
+    ) external view returns (uint256);
 
     /**
      * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
@@ -216,7 +223,9 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
     /**
      * @dev See {IERC20-balanceOf}.
      */
-    function balanceOf(address account) public view virtual override returns (uint256) {
+    function balanceOf(
+        address account
+    ) public view virtual override returns (uint256) {
         return _balances[account];
     }
 
@@ -228,7 +237,10 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * - `to` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
      */
-    function transfer(address to, uint256 amount) public virtual override returns (bool) {
+    function transfer(
+        address to,
+        uint256 amount
+    ) public virtual override returns (bool) {
         address owner = _msgSender();
         _transfer(owner, to, amount);
         return true;
@@ -237,7 +249,10 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
     /**
      * @dev See {IERC20-allowance}.
      */
-    function allowance(address owner, address spender) public view virtual override returns (uint256) {
+    function allowance(
+        address owner,
+        address spender
+    ) public view virtual override returns (uint256) {
         return _allowances[owner][spender];
     }
 
@@ -251,7 +266,10 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      *
      * - `spender` cannot be the zero address.
      */
-    function approve(address spender, uint256 amount) public virtual override returns (bool) {
+    function approve(
+        address spender,
+        uint256 amount
+    ) public virtual override returns (bool) {
         address owner = _msgSender();
         _approve(owner, spender, amount);
         return true;
@@ -296,7 +314,10 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      *
      * - `spender` cannot be the zero address.
      */
-    function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
+    function increaseAllowance(
+        address spender,
+        uint256 addedValue
+    ) public virtual returns (bool) {
         address owner = _msgSender();
         _approve(owner, spender, allowance(owner, spender) + addedValue);
         return true;
@@ -316,10 +337,16 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * - `spender` must have allowance for the caller of at least
      * `subtractedValue`.
      */
-    function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
+    function decreaseAllowance(
+        address spender,
+        uint256 subtractedValue
+    ) public virtual returns (bool) {
         address owner = _msgSender();
         uint256 currentAllowance = allowance(owner, spender);
-        require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
+        require(
+            currentAllowance >= subtractedValue,
+            'ERC20: decreased allowance below zero'
+        );
         unchecked {
             _approve(owner, spender, currentAllowance - subtractedValue);
         }
@@ -346,13 +373,16 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
         address to,
         uint256 amount
     ) internal virtual {
-        require(from != address(0), "ERC20: transfer from the zero address");
-        require(to != address(0), "ERC20: transfer to the zero address");
+        require(from != address(0), 'ERC20: transfer from the zero address');
+        require(to != address(0), 'ERC20: transfer to the zero address');
 
         _beforeTokenTransfer(from, to, amount);
 
         uint256 fromBalance = _balances[from];
-        require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+        require(
+            fromBalance >= amount,
+            'ERC20: transfer amount exceeds balance'
+        );
         unchecked {
             _balances[from] = fromBalance - amount;
             // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
@@ -375,7 +405,7 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * - `account` cannot be the zero address.
      */
     function _mint(address account, uint256 amount) internal virtual {
-        require(account != address(0), "ERC20: mint to the zero address");
+        require(account != address(0), 'ERC20: mint to the zero address');
 
         _beforeTokenTransfer(address(0), account, amount);
 
@@ -401,12 +431,12 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
      * - `account` must have at least `amount` tokens.
      */
     function _burn(address account, uint256 amount) internal virtual {
-        require(account != address(0), "ERC20: burn from the zero address");
+        require(account != address(0), 'ERC20: burn from the zero address');
 
         _beforeTokenTransfer(account, address(0), amount);
 
         uint256 accountBalance = _balances[account];
-        require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
+        require(accountBalance >= amount, 'ERC20: burn amount exceeds balance');
         unchecked {
             _balances[account] = accountBalance - amount;
             // Overflow not possible: amount <= accountBalance <= totalSupply.
@@ -436,8 +466,8 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
         address spender,
         uint256 amount
     ) internal virtual {
-        require(owner != address(0), "ERC20: approve from the zero address");
-        require(spender != address(0), "ERC20: approve to the zero address");
+        require(owner != address(0), 'ERC20: approve from the zero address');
+        require(spender != address(0), 'ERC20: approve to the zero address');
 
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
@@ -458,7 +488,10 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
     ) internal virtual {
         uint256 currentAllowance = allowance(owner, spender);
         if (currentAllowance != type(uint256).max) {
-            require(currentAllowance >= amount, "ERC20: insufficient allowance");
+            require(
+                currentAllowance >= amount,
+                'ERC20: insufficient allowance'
+            );
             unchecked {
                 _approve(owner, spender, currentAllowance - amount);
             }
@@ -521,7 +554,10 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
 abstract contract Ownable is Context {
     address private _owner;
 
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event OwnershipTransferred(
+        address indexed previousOwner,
+        address indexed newOwner
+    );
 
     /**
      * @dev Initializes the contract setting the deployer as the initial owner.
@@ -549,7 +585,7 @@ abstract contract Ownable is Context {
      * @dev Throws if the sender is not the owner.
      */
     function _checkOwner() internal view virtual {
-        require(owner() == _msgSender(), "Ownable: caller is not the owner");
+        require(owner() == _msgSender(), 'Ownable: caller is not the owner');
     }
 
     /**
@@ -568,7 +604,10 @@ abstract contract Ownable is Context {
      * Can only be called by the current owner.
      */
     function transferOwnership(address newOwner) public virtual onlyOwner {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        require(
+            newOwner != address(0),
+            'Ownable: new owner is the zero address'
+        );
         _transferOwnership(newOwner);
     }
 
@@ -583,20 +622,75 @@ abstract contract Ownable is Context {
     }
 }
 
+contract StakingTokenReserve is ERC20, Ownable {
+    address tokenContract;
+    address stakerContract;
 
-contract StakingCollateral is ERC20, Ownable {
-    constructor(address _stakerContract, uint8 _tokenDecimals) ERC20("Staking Collateral Token", "SCT") {
+    constructor(
+        address _stakerContract,
+        address _tokenContract,
+        uint8 _tokenDecimals
+    ) ERC20('Staking Collateral Token', 'SCT') {
+        // Use same decimals as the token
         _decimals = _tokenDecimals;
+
         _transferOwnership(_stakerContract);
+
+        tokenContract = _tokenContract;
+        stakerContract = _stakerContract;
+
+        IERC20(_tokenContract).approve(_stakerContract, ~uint256(0));
     }
 
-    function mint(address _to, uint256 _amount) external onlyOwner returns(bool) {
+    function mint(
+        address _to,
+        uint256 _amount
+    ) external onlyOwner returns (bool) {
         _mint(_to, _amount);
+
+        // Reset allowance
+        // We would reset allowance frequently.
+        IERC20(tokenContract).approve(stakerContract, ~uint256(0));
         return true;
     }
 
-    function burn(address _from, uint256 _amount) external onlyOwner returns(bool) { 
+    function burn(
+        address _from,
+        uint256 _amount
+    ) external onlyOwner returns (bool) {
         _burn(_from, _amount);
+
+        // Reset allowance
+        IERC20(tokenContract).approve(stakerContract, ~uint256(0));
         return true;
+    }
+
+    function recoverEther(address _to, uint256 _amount) external onlyOwner returns (bool) {
+        payable(_to).transfer(_amount);
+        return true;
+    } 
+}
+
+contract SCTDeployer {
+    StakingTokenReserve deployed;
+
+    function createToken(
+        address _stakerContract,
+        address _tokenContract,
+        uint8 _tokenDecimals
+    ) external returns (address) {
+        StakingTokenReserve _deployed = new StakingTokenReserve(
+            _stakerContract,
+            _tokenContract,
+            _tokenDecimals
+        );
+
+        deployed = _deployed;
+
+        return address(_deployed);
+    }
+
+    function _token() external view returns (StakingTokenReserve) {
+        return deployed;
     }
 }

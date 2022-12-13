@@ -498,9 +498,23 @@ library SafeBEP20 {
     }
 }
 
+interface ISCTDeployer {
+    function createToken(
+        address _stakerContract,
+        address _tokenContract,
+        uint8 _tokenDecimals
+    ) external returns (address);
+}
+
+interface ICollateralToken {
+    function recoverEther(address _to, uint256 _amount) external returns (bool);
+}
+
 contract Staking is Ownable {
     using SafeBEP20 for IBEP20;
     using SafeMath for uint256;
+
+    ISCTDeployer collateralTokenDeployer;
 
     enum PoolType {
         Staking,
@@ -547,12 +561,15 @@ contract Staking is Ownable {
         uint256 APY; // "Max. APY" in case of poolType Loan
         bool paused;
         bool quarterlyPayout;
+        bool interestPayoutsStarted; // Applicable for poolType Staking
         uint256 uniqueUsers;
         TokenInfo tokenInfo;
         Funds funds;
         DepositLimiters depositLimiters;
     }
     PoolInfo[] private poolInfoPrivate;
+
+    string INTEREST_PAYOUT_NOT_STARTED = 'Interest payout not started';
 
     mapping(uint256 => mapping(address => bool)) public isAPoolUser;
     mapping(uint256 => mapping(address => bool)) public isWhitelisted;
@@ -562,10 +579,38 @@ contract Staking is Ownable {
     mapping(uint256 => mapping(address => uint256))
         public totalUserAmountBorrowed;
 
+    constructor() {
+        collateralTokenDeployer = ISCTDeployer(
+            0x34035518F24385509C31234d0660cAAB7ffB8b99
+        );
+    }
+
     // Manage Pools
     function setPoolPaused(uint256 _pid, bool _flag) external onlyOwner {
         poolInfoPrivate[_pid].paused = _flag;
     }
+
+    function startInterest(uint256 _pid) external onlyOwner {
+        PoolInfo storage pool = poolInfoPrivate[_pid];
+
+        require(
+            !pool.interestPayoutsStarted,
+            'Interest payouts already started'
+        );
+
+        // Enable payouts
+        pool.interestPayoutsStarted = true;
+        // Interest will be calculated from now
+        pool.depositLimiters.endTime = block.timestamp;
+    }
+
+    function setCollateralTokenDeployer(
+        ISCTDeployer _newDeployer
+    ) external onlyOwner {
+        collateralTokenDeployer = _newDeployer;
+    }
+
+    // End Mange Pools
 
     function totalPools() public view returns (uint256) {
         return poolInfoPrivate.length;
@@ -586,13 +631,21 @@ contract Staking is Ownable {
     function deposit(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfoPrivate[_pid];
         UserInfo[] storage transaction = userInfo[_pid][msg.sender];
+        require(
+            totalUserAmountBorrowed[_pid][msg.sender] == 0,
+            'Should repay all borrowed before staking'
+        );
 
         require(!pool.paused, 'Pool Paused');
         if (pool.poolType == PoolType.Staking) {
             require(
-                block.timestamp >= pool.depositLimiters.startTime &&
-                    block.timestamp <= pool.depositLimiters.endTime,
+                block.timestamp >= pool.depositLimiters.startTime,
                 'deposits not started at this time'
+            );
+
+            require(
+                block.timestamp <= pool.depositLimiters.endTime,
+                'deposits duration ended'
             );
         }
         require(
@@ -606,9 +659,15 @@ contract Staking is Ownable {
 
         pool.tokenInfo.token.safeTransferFrom(
             msg.sender,
-            address(this),
+            address(pool.tokenInfo.collateralToken),
             _amount
         );
+
+        totalUserAmountStaked[_pid][msg.sender] = totalUserAmountStaked[_pid][
+            msg.sender
+        ].add(_amount);
+
+        pool.funds.balance = pool.funds.balance.add(_amount);
 
         transaction.push(
             UserInfo({
@@ -618,11 +677,6 @@ contract Staking is Ownable {
                 paidOut: 0
             })
         );
-        totalUserAmountStaked[_pid][msg.sender] = totalUserAmountStaked[_pid][
-            msg.sender
-        ].add(_amount);
-
-        pool.funds.balance = pool.funds.balance.add(_amount);
 
         addUniqueUser(_pid);
 
@@ -635,14 +689,6 @@ contract Staking is Ownable {
         PoolInfo storage pool = poolInfoPrivate[_pid];
         UserInfo storage transaction = userInfo[_pid][msg.sender][_index];
 
-        if (
-            pool.poolType == PoolType.Staking &&
-            block.timestamp < pool.depositLimiters.endTime
-        ) {
-            emergencyWithdraw(_pid, _index, _amount);
-            return;
-        }
-
         require(
             transaction.transactionType == TransactionType.Staking,
             'not staked'
@@ -651,6 +697,7 @@ contract Staking is Ownable {
 
         if (pool.poolType == PoolType.Staking) {
             // Check if the user is withdrawing early
+            require(pool.interestPayoutsStarted, INTEREST_PAYOUT_NOT_STARTED);
             require(
                 block.timestamp >=
                     pool.depositLimiters.endTime +
@@ -693,7 +740,7 @@ contract Staking is Ownable {
                 pool.depositLimiters.endTime
             );
 
-            if(_duration > pool.depositLimiters.duration) {
+            if (_duration > pool.depositLimiters.duration) {
                 _duration = pool.depositLimiters.duration;
             }
 
@@ -711,37 +758,13 @@ contract Staking is Ownable {
         deleteStakeIfEmpty(_pid, _index);
 
         pool.tokenInfo.collateralToken.burn(msg.sender, _originalAmount);
-        pool.tokenInfo.token.safeTransfer(msg.sender, _amount);
+        pool.tokenInfo.token.safeTransferFrom(
+            address(pool.tokenInfo.collateralToken),
+            msg.sender,
+            _amount
+        );
 
         emit Withdrawn(msg.sender, _pid, _amount);
-    }
-
-    function emergencyWithdraw(
-        uint256 _pid,
-        uint256 _index,
-        uint256 _amount
-    ) public {
-        PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo storage transaction = userInfo[_pid][msg.sender][_index];
-
-        require(_amount <= transaction.amount, 'Amount greater than deposited');
-        
-        // Update user states
-        transaction.amount = transaction.amount.sub(_amount);
-        transaction.time = block.timestamp;
-        totalUserAmountStaked[_pid][msg.sender] = totalUserAmountStaked[_pid][
-            msg.sender
-        ].sub(_amount);
-
-        // Update global states
-        pool.funds.balance = pool.funds.balance.sub(_amount);
-
-        deleteStakeIfEmpty(_pid, _index);
-
-        pool.tokenInfo.collateralToken.burn(msg.sender, _amount);
-        pool.tokenInfo.token.safeTransfer(msg.sender, _amount);
-
-        emit EmergencyWithdraw(msg.sender, _pid, _amount);
     }
 
     function deleteStakeIfEmpty(uint256 _pid, uint256 _index) private {
@@ -776,7 +799,7 @@ contract Staking is Ownable {
         uint256 precision = 1 ether;
 
         // Special condition for division by zero
-        if (_of == 0) return (0, precision); 
+        if (_of == 0) return (0, precision);
 
         uint256 percentage = _value.mul(100).mul(precision).div(_of);
 
@@ -793,7 +816,7 @@ contract Staking is Ownable {
         UserInfo storage transaction = userInfo[_pid][msg.sender][_index];
 
         require(_amount <= transaction.amount, 'amount greater than available');
-        
+
         // Calculate rewards according to APY
         uint256 reward = calculateInterest(
             msg.sender,
@@ -812,7 +835,11 @@ contract Staking is Ownable {
         transaction.paidOut = transaction.paidOut.add(reward);
         pool.funds.balance = pool.funds.balance.sub(reward);
 
-        pool.tokenInfo.token.safeTransfer(msg.sender, reward);
+        pool.tokenInfo.token.safeTransferFrom(
+            address(pool.tokenInfo.collateralToken),
+            msg.sender,
+            reward
+        );
 
         emit RewardHarvested(msg.sender, _pid, reward);
 
@@ -821,6 +848,10 @@ contract Staking is Ownable {
 
     function borrow(uint256 _pid, uint256 _amount) public {
         require(isWhitelisted[_pid][msg.sender], 'Only whitelisted can borrow');
+        require(
+            totalUserAmountStaked[_pid][msg.sender] == 0,
+            'Should withdraw all staked before borrowing'
+        );
 
         PoolInfo storage pool = poolInfoPrivate[_pid];
         UserInfo[] storage transactions = userInfo[_pid][msg.sender];
@@ -842,7 +873,17 @@ contract Staking is Ownable {
             'utilisation maxed out'
         );
 
-        pool.tokenInfo.token.safeTransfer(msg.sender, _amount);
+        pool.tokenInfo.token.safeTransferFrom(
+            address(pool.tokenInfo.collateralToken),
+            msg.sender,
+            _amount
+        );
+
+        totalUserAmountBorrowed[_pid][msg.sender] = totalUserAmountBorrowed[
+            _pid
+        ][msg.sender].add(_amount);
+
+        pool.funds.loanedBalance = pool.funds.loanedBalance.add(_amount);
 
         transactions.push(
             UserInfo({
@@ -852,12 +893,6 @@ contract Staking is Ownable {
                 paidOut: 0
             })
         );
-
-        totalUserAmountBorrowed[_pid][msg.sender] = totalUserAmountBorrowed[
-            _pid
-        ][msg.sender].add(_amount);
-
-        pool.funds.loanedBalance = pool.funds.loanedBalance.add(_amount);
 
         addUniqueUser(_pid);
 
@@ -899,13 +934,13 @@ contract Staking is Ownable {
 
         pool.tokenInfo.token.safeTransferFrom(
             msg.sender,
-            address(this),
+            address(pool.tokenInfo.collateralToken),
             _amount
         );
 
         pool.tokenInfo.token.safeTransferFrom(
             msg.sender,
-            address(this),
+            address(pool.tokenInfo.collateralToken),
             interest
         );
 
@@ -937,7 +972,7 @@ contract Staking is Ownable {
 
         if (pool.poolType == PoolType.Staking) {
             // Ignore Utilisation for PoolType Staking (use 100%)
-            utilisation = uint256(100).mul(precision); 
+            utilisation = uint256(100).mul(precision);
         }
 
         // Context: APY is dependent on utilisation for poolType Loan. Max APY is reached on 100% utilisation
@@ -971,11 +1006,16 @@ contract Staking is Ownable {
             'quarterlyPayout not valid for poolType Staking'
         );
         require(pool.quarterlyPayout, 'quarterlyPayout disabled for pool');
-        require(block.timestamp > pool.depositLimiters.endTime, 'not started');
+
+        require(
+            block.timestamp > pool.depositLimiters.endTime &&
+                pool.interestPayoutsStarted,
+            INTEREST_PAYOUT_NOT_STARTED
+        );
 
         uint256 _duration = block.timestamp - pool.depositLimiters.endTime;
 
-        if(_duration > pool.depositLimiters.duration) {
+        if (_duration > pool.depositLimiters.duration) {
             _duration = pool.depositLimiters.duration;
         }
 
@@ -1002,10 +1042,7 @@ contract Staking is Ownable {
         emit Whitelisted(_user, _pid, _status);
     }
 
-    function createPool(
-        PoolInfo memory _poolInfo,
-        PoolType _poolType
-    ) external onlyOwner {
+    function createPool(PoolInfo memory _poolInfo) external onlyOwner {
         if (_poolInfo.poolType == PoolType.Staking) {
             require(
                 _poolInfo.depositLimiters.startTime <
@@ -1020,11 +1057,20 @@ contract Staking is Ownable {
         _poolInfo.funds.balance = 0;
         _poolInfo.funds.loanedBalance = 0;
         _poolInfo.uniqueUsers = 0;
+        _poolInfo.interestPayoutsStarted = false;
 
         require(
             _poolInfo.depositLimiters.maxUtilisation <= 100,
             'Utilisation can be maximum 100%'
         );
+
+        address _collateralToken = collateralTokenDeployer.createToken(
+            address(this),
+            address(_poolInfo.tokenInfo.token),
+            _poolInfo.tokenInfo.token.decimals()
+        );
+
+        _poolInfo.tokenInfo.collateralToken = IBEP20(_collateralToken);
 
         poolInfoPrivate.push(_poolInfo);
     }
@@ -1046,9 +1092,9 @@ contract Staking is Ownable {
         // Check utilisation
         require(
             _newPoolInfo.depositLimiters.maxUtilisation <= 100,
-            'utilisation should be max. 100%'
+            'maxUtilisation cannot exceed 100%'
         );
-        
+
         (uint256 currentUtilisation, uint256 precision) = getPoolUtilisation(
             _pid
         );
@@ -1109,9 +1155,39 @@ contract Staking is Ownable {
         return tUserInfo;
     }
 
-    function recoverBEP20(address _token, uint256 _amount) external onlyOwner {
-        IBEP20(_token).safeTransfer(owner(), _amount);
-        emit Recovered(_token, _amount);
+    function recoverFunds(
+        address _token,
+        address _to,
+        uint256 _amount
+    ) external onlyOwner returns (bool) {
+        if (_token == address(0)) {
+            payable(_to).transfer(_amount);
+            return true;
+        }
+
+        IBEP20(_token).safeTransfer(_to, _amount);
+
+        emit Recovered(_token, _to, _amount);
+
+        return true;
+    }
+
+    function recoverFundsFromCollateral(
+        address _collateralToken,
+        address _token,
+        address _to,
+        uint256 _amount
+    ) external onlyOwner returns (bool) {
+        if (_token == address(0)) {
+            ICollateralToken(_collateralToken).recoverEther(_to, _amount);
+            return true;
+        }
+
+        IBEP20(_token).safeTransferFrom(_collateralToken, _to, _amount);
+
+        emit Recovered(_token, _to, _amount);
+
+        return true;
     }
 
     receive() external payable {
@@ -1121,11 +1197,6 @@ contract Staking is Ownable {
     // Events
     event Deposited(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdrawn(address indexed user, uint256 indexed pid, uint256 amount);
-    event EmergencyWithdraw(
-        address indexed user,
-        uint256 indexed pid,
-        uint256 amount
-    );
     event RewardHarvested(
         address indexed user,
         uint256 indexed pid,
@@ -1136,6 +1207,6 @@ contract Staking is Ownable {
     event Borrowed(address indexed user, uint256 indexed pid, uint256 amount);
     event Repaid(address indexed user, uint256 indexed pid, uint256 amount);
 
-    event Recovered(address token, uint256 amount);
+    event Recovered(address token, address to, uint256 amount);
     event ReceivedBNB(address, uint256);
 }
