@@ -2,46 +2,122 @@
 
 pragma solidity ^0.8.7;
 
-/*
- * @dev Provides information about the current execution context, including the
- * sender of the transaction and its data. While these are generally available
- * via msg.sender and msg.data, they should not be accessed in such a direct
- * manner, since when dealing with meta-transactions the account sending and
- * paying for execution may not be the actual sender (as far as an application
- * is concerned).
+// OpenZeppelin Contracts (last updated v4.6.0) (utils/math/SafeMath.sol)
+
+/**
+ * @dev Wrappers over Solidity's arithmetic operations.
  *
- * This contract is only required for intermediate, library-like contracts.
+ * NOTE: `SafeMath` is generally not needed starting with Solidity 0.8, since the compiler
+ * now has built in overflow checking.
  */
 library SafeMath {
-    function add(uint256 a, uint256 b) internal pure returns (uint256) {
-        uint256 c = a + b;
-        require(c >= a, 'SafeMath: addition overflow');
-
-        return c;
-    }
-
-    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-        return sub(a, b, 'SafeMath: subtraction overflow');
+    /**
+     * @dev Returns the addition of two unsigned integers, with an overflow flag.
+     *
+     * _Available since v3.4._
+     */
+    function tryAdd(
+        uint256 a,
+        uint256 b
+    ) internal pure returns (bool, uint256) {
+        unchecked {
+            uint256 c = a + b;
+            if (c < a) return (false, 0);
+            return (true, c);
+        }
     }
 
     /**
-     * @dev Returns the subtraction of two unsigned integers, reverting with custom message on
+     * @dev Returns the subtraction of two unsigned integers, with an overflow flag.
+     *
+     * _Available since v3.4._
+     */
+    function trySub(
+        uint256 a,
+        uint256 b
+    ) internal pure returns (bool, uint256) {
+        unchecked {
+            if (b > a) return (false, 0);
+            return (true, a - b);
+        }
+    }
+
+    /**
+     * @dev Returns the multiplication of two unsigned integers, with an overflow flag.
+     *
+     * _Available since v3.4._
+     */
+    function tryMul(
+        uint256 a,
+        uint256 b
+    ) internal pure returns (bool, uint256) {
+        unchecked {
+            // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
+            // benefit is lost if 'b' is also tested.
+            // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
+            if (a == 0) return (true, 0);
+            uint256 c = a * b;
+            if (c / a != b) return (false, 0);
+            return (true, c);
+        }
+    }
+
+    /**
+     * @dev Returns the division of two unsigned integers, with a division by zero flag.
+     *
+     * _Available since v3.4._
+     */
+    function tryDiv(
+        uint256 a,
+        uint256 b
+    ) internal pure returns (bool, uint256) {
+        unchecked {
+            if (b == 0) return (false, 0);
+            return (true, a / b);
+        }
+    }
+
+    /**
+     * @dev Returns the remainder of dividing two unsigned integers, with a division by zero flag.
+     *
+     * _Available since v3.4._
+     */
+    function tryMod(
+        uint256 a,
+        uint256 b
+    ) internal pure returns (bool, uint256) {
+        unchecked {
+            if (b == 0) return (false, 0);
+            return (true, a % b);
+        }
+    }
+
+    /**
+     * @dev Returns the addition of two unsigned integers, reverting on
+     * overflow.
+     *
+     * Counterpart to Solidity's `+` operator.
+     *
+     * Requirements:
+     *
+     * - Addition cannot overflow.
+     */
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a + b;
+    }
+
+    /**
+     * @dev Returns the subtraction of two unsigned integers, reverting on
      * overflow (when the result is negative).
      *
      * Counterpart to Solidity's `-` operator.
      *
      * Requirements:
+     *
      * - Subtraction cannot overflow.
      */
-    function sub(
-        uint256 a,
-        uint256 b,
-        string memory errorMessage
-    ) internal pure returns (uint256) {
-        require(b <= a, errorMessage);
-        uint256 c = a - b;
-
-        return c;
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a - b;
     }
 
     /**
@@ -51,39 +127,69 @@ library SafeMath {
      * Counterpart to Solidity's `*` operator.
      *
      * Requirements:
+     *
      * - Multiplication cannot overflow.
      */
     function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-        // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
-        // benefit is lost if 'b' is also tested.
-        // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
-        if (a == 0) {
-            return 0;
-        }
-
-        uint256 c = a * b;
-        require(c / a == b, 'SafeMath: multiplication overflow');
-
-        return c;
+        return a * b;
     }
 
     /**
-     * @dev Returns the integer division of two unsigned integers. Reverts on
+     * @dev Returns the integer division of two unsigned integers, reverting on
      * division by zero. The result is rounded towards zero.
      *
-     * Counterpart to Solidity's `/` operator. Note: this function uses a
-     * `revert` opcode (which leaves remaining gas untouched) while Solidity
-     * uses an invalid opcode to revert (consuming all remaining gas).
+     * Counterpart to Solidity's `/` operator.
      *
      * Requirements:
+     *
      * - The divisor cannot be zero.
      */
     function div(uint256 a, uint256 b) internal pure returns (uint256) {
-        return div(a, b, 'SafeMath: division by zero');
+        return a / b;
     }
 
     /**
-     * @dev Returns the integer division of two unsigned integers. Reverts with custom message on
+     * @dev Returns the remainder of dividing two unsigned integers. (unsigned integer modulo),
+     * reverting when dividing by zero.
+     *
+     * Counterpart to Solidity's `%` operator. This function uses a `revert`
+     * opcode (which leaves remaining gas untouched) while Solidity uses an
+     * invalid opcode to revert (consuming all remaining gas).
+     *
+     * Requirements:
+     *
+     * - The divisor cannot be zero.
+     */
+    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a % b;
+    }
+
+    /**
+     * @dev Returns the subtraction of two unsigned integers, reverting with custom message on
+     * overflow (when the result is negative).
+     *
+     * CAUTION: This function is deprecated because it requires allocating memory for the error
+     * message unnecessarily. For custom revert reasons use {trySub}.
+     *
+     * Counterpart to Solidity's `-` operator.
+     *
+     * Requirements:
+     *
+     * - Subtraction cannot overflow.
+     */
+    function sub(
+        uint256 a,
+        uint256 b,
+        string memory errorMessage
+    ) internal pure returns (uint256) {
+        unchecked {
+            require(b <= a, errorMessage);
+            return a - b;
+        }
+    }
+
+    /**
+     * @dev Returns the integer division of two unsigned integers, reverting with custom message on
      * division by zero. The result is rounded towards zero.
      *
      * Counterpart to Solidity's `/` operator. Note: this function uses a
@@ -91,6 +197,7 @@ library SafeMath {
      * uses an invalid opcode to revert (consuming all remaining gas).
      *
      * Requirements:
+     *
      * - The divisor cannot be zero.
      */
     function div(
@@ -98,38 +205,25 @@ library SafeMath {
         uint256 b,
         string memory errorMessage
     ) internal pure returns (uint256) {
-        // Solidity only automatically asserts when dividing by 0
-        require(b > 0, errorMessage);
-        uint256 c = a / b;
-        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-
-        return c;
+        unchecked {
+            require(b > 0, errorMessage);
+            return a / b;
+        }
     }
 
     /**
      * @dev Returns the remainder of dividing two unsigned integers. (unsigned integer modulo),
-     * Reverts when dividing by zero.
+     * reverting with custom message when dividing by zero.
+     *
+     * CAUTION: This function is deprecated because it requires allocating memory for the error
+     * message unnecessarily. For custom revert reasons use {tryMod}.
      *
      * Counterpart to Solidity's `%` operator. This function uses a `revert`
      * opcode (which leaves remaining gas untouched) while Solidity uses an
      * invalid opcode to revert (consuming all remaining gas).
      *
      * Requirements:
-     * - The divisor cannot be zero.
-     */
-    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
-        return mod(a, b, 'SafeMath: modulo by zero');
-    }
-
-    /**
-     * @dev Returns the remainder of dividing two unsigned integers. (unsigned integer modulo),
-     * Reverts with custom message when dividing by zero.
      *
-     * Counterpart to Solidity's `%` operator. This function uses a `revert`
-     * opcode (which leaves remaining gas untouched) while Solidity uses an
-     * invalid opcode to revert (consuming all remaining gas).
-     *
-     * Requirements:
      * - The divisor cannot be zero.
      */
     function mod(
@@ -137,8 +231,10 @@ library SafeMath {
         uint256 b,
         string memory errorMessage
     ) internal pure returns (uint256) {
-        require(b != 0, errorMessage);
-        return a % b;
+        unchecked {
+            require(b > 0, errorMessage);
+            return a % b;
+        }
     }
 }
 
@@ -213,47 +309,114 @@ abstract contract Ownable is Context {
 }
 
 interface IBEP20 {
+    /**
+     * @dev Returns the amount of tokens in existence.
+     */
     function totalSupply() external view returns (uint256);
 
+    /**
+     * @dev Returns the token decimals.
+     */
     function decimals() external view returns (uint8);
 
+    /**
+     * @dev Returns the token symbol.
+     */
     function symbol() external view returns (string memory);
 
+    /**
+     * @dev Returns the token name.
+     */
     function name() external view returns (string memory);
 
+    /**
+     * @dev Returns the bep token owner.
+     */
     function getOwner() external view returns (address);
 
+    /**
+     * @dev Returns the amount of tokens owned by `account`.
+     */
     function balanceOf(address account) external view returns (uint256);
 
+    /**
+     * @dev Moves `amount` tokens from the caller's account to `recipient`.
+     *
+     * Returns a boolean value indicating whether the operation succeeded.
+     *
+     * Emits a {Transfer} event.
+     */
     function transfer(
         address recipient,
         uint256 amount
     ) external returns (bool);
 
+    /**
+     * @dev Returns the remaining number of tokens that `spender` will be
+     * allowed to spend on behalf of `owner` through {transferFrom}. This is
+     * zero by default.
+     *
+     * This value changes when {approve} or {transferFrom} are called.
+     */
     function allowance(
         address _owner,
         address spender
     ) external view returns (uint256);
 
+    /**
+     * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
+     *
+     * Returns a boolean value indicating whether the operation succeeded.
+     *
+     * IMPORTANT: Beware that changing an allowance with this method brings the risk
+     * that someone may use both the old and the new allowance by unfortunate
+     * transaction ordering. One possible solution to mitigate this race
+     * condition is to first reduce the spender's allowance to 0 and set the
+     * desired value afterwards:
+     * https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+     *
+     * Emits an {Approval} event.
+     */
     function approve(address spender, uint256 amount) external returns (bool);
 
+    /**
+     * @dev Moves `amount` tokens from `sender` to `recipient` using the
+     * allowance mechanism. `amount` is then deducted from the caller's
+     * allowance.
+     *
+     * Returns a boolean value indicating whether the operation succeeded.
+     *
+     * Emits a {Transfer} event.
+     */
     function transferFrom(
         address sender,
         address recipient,
         uint256 amount
     ) external returns (bool);
 
-    function mint(address to, uint256 amount) external returns (bool);
-
-    function burn(address from, uint256 amount) external returns (bool);
-
+    /**
+     * @dev Emitted when `value` tokens are moved from one account (`from`) to
+     * another (`to`).
+     *
+     * Note that `value` may be zero.
+     */
     event Transfer(address indexed from, address indexed to, uint256 value);
 
+    /**
+     * @dev Emitted when the allowance of a `spender` for an `owner` is set by
+     * a call to {approve}. `value` is the new allowance.
+     */
     event Approval(
         address indexed owner,
         address indexed spender,
         uint256 value
     );
+}
+
+interface IBEP20SupplyControl is IBEP20 {
+    function mintCollateralToken(address to, uint256 amount) external returns (bool);
+
+    function burnCollateralToken(address from, uint256 amount) external returns (bool);
 }
 
 library Address {
@@ -498,23 +661,23 @@ library SafeBEP20 {
     }
 }
 
-interface ISCTDeployer {
-    function createToken(
+interface IReserveDeployer {
+    function createReserve(
         address _stakerContract,
         address _tokenContract,
         uint8 _tokenDecimals
     ) external returns (address);
 }
 
-interface ICollateralToken {
-    function recoverEther(address _to, uint256 _amount) external returns (bool);
+interface IReserve {
+    function resetAllowance() external;
 }
 
 contract Staking is Ownable {
     using SafeBEP20 for IBEP20;
     using SafeMath for uint256;
 
-    ISCTDeployer collateralTokenDeployer;
+    IReserveDeployer private immutable reserveDeployer;
 
     enum PoolType {
         Staking,
@@ -526,7 +689,7 @@ contract Staking is Ownable {
         Borrow
     }
 
-    struct UserInfo {
+    struct Transaction {
         TransactionType transactionType;
         uint256 amount;
         uint256 time;
@@ -535,14 +698,14 @@ contract Staking is Ownable {
 
     struct TokenInfo {
         IBEP20 token;
-        IBEP20 collateralToken;
+        IBEP20SupplyControl reserve;
         uint256 decimals;
         string name;
         string symbol;
     }
 
     struct DepositLimiters {
-        uint256 duration;
+        uint256 duration; // Lockup period
         uint256 startTime; // Deposits Start Time
         uint256 endTime; // Deposits End Time
         uint256 limitPerUser; // Limit Per Deposit Transaction
@@ -553,6 +716,14 @@ contract Staking is Ownable {
     struct Funds {
         uint256 balance;
         uint256 loanedBalance;
+    }
+
+    struct UserInfo {
+        bool isAPoolUser;
+        bool isWhitelisted;
+        Transaction[] transactions;
+        uint256 totalAmountStaked;
+        uint256 totalAmountBorrowed;
     }
 
     struct PoolInfo {
@@ -569,51 +740,57 @@ contract Staking is Ownable {
     }
     PoolInfo[] private poolInfoPrivate;
 
-    string INTEREST_PAYOUT_NOT_STARTED = 'Interest payout not started';
+    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
 
-    mapping(uint256 => mapping(address => bool)) public isAPoolUser;
-    mapping(uint256 => mapping(address => bool)) public isWhitelisted;
-    mapping(uint256 => mapping(address => UserInfo[])) public userInfo;
-    mapping(uint256 => mapping(address => uint256))
-        public totalUserAmountStaked;
-    mapping(uint256 => mapping(address => uint256))
-        public totalUserAmountBorrowed;
+    // Values used throughout the contract
+    string private INTEREST_PAYOUT_NOT_STARTED = 'Interest payout not started';
+    uint256 private oneHundred = 100;
+    uint256 private percentagePrecision = 1 ether;
+    uint256 private oneYear = 365 days;
+    uint256 private ninetyDays = 90 days;
+    uint256 private zero = 0;
+    uint256 private one = 1;
 
-    constructor() {
-        collateralTokenDeployer = ISCTDeployer(
-            0x34035518F24385509C31234d0660cAAB7ffB8b99
-        );
+    constructor(IReserveDeployer _reserveDeployer) {
+        reserveDeployer = _reserveDeployer;
     }
 
     // Manage Pools
     function setPoolPaused(uint256 _pid, bool _flag) external onlyOwner {
         poolInfoPrivate[_pid].paused = _flag;
+        emit PoolPaused(_pid, _flag);
     }
 
     function startInterest(uint256 _pid) external onlyOwner {
         PoolInfo storage pool = poolInfoPrivate[_pid];
 
+        require(pool.poolType == PoolType.Staking, 'Only applicable for pool type staking');
         require(
             !pool.interestPayoutsStarted,
             'Interest payouts already started'
         );
 
+        // Interest will be calculated from now and
+        // further deposits will be disabled immediately
+        pool.depositLimiters.endTime = block.timestamp;
+
         // Enable payouts
         pool.interestPayoutsStarted = true;
-        // Interest will be calculated from now
-        pool.depositLimiters.endTime = block.timestamp;
-    }
-
-    function setCollateralTokenDeployer(
-        ISCTDeployer _newDeployer
-    ) external onlyOwner {
-        collateralTokenDeployer = _newDeployer;
     }
 
     // End Mange Pools
 
     function totalPools() public view returns (uint256) {
         return poolInfoPrivate.length;
+    }
+
+    function shouldReserveResetAllowance(
+        IBEP20SupplyControl _reserve,
+        IBEP20 _token,
+        uint256 amount
+    ) private view returns (bool) {
+        return
+            IBEP20(_token).allowance(address(_reserve), address(this)) < amount;
     }
 
     function poolInfo(uint256 _pid) external view returns (PoolInfo memory) {
@@ -630,9 +807,11 @@ contract Staking is Ownable {
 
     function deposit(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo[] storage transaction = userInfo[_pid][msg.sender];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+        Transaction[] storage transactions = user.transactions;
+
         require(
-            totalUserAmountBorrowed[_pid][msg.sender] == 0,
+            user.totalAmountBorrowed == zero,
             'Should repay all borrowed before staking'
         );
 
@@ -653,41 +832,40 @@ contract Staking is Ownable {
             'amount exceeds limit per transaction'
         );
         require(
-            pool.funds.balance + _amount <= pool.depositLimiters.capacity,
+            pool.funds.balance.add(_amount) <= pool.depositLimiters.capacity,
             'pool capacity reached'
         );
 
         pool.tokenInfo.token.safeTransferFrom(
             msg.sender,
-            address(pool.tokenInfo.collateralToken),
+            address(pool.tokenInfo.reserve),
             _amount
         );
 
-        totalUserAmountStaked[_pid][msg.sender] = totalUserAmountStaked[_pid][
-            msg.sender
-        ].add(_amount);
+        user.totalAmountStaked = user.totalAmountStaked.add(_amount);
 
         pool.funds.balance = pool.funds.balance.add(_amount);
 
-        transaction.push(
-            UserInfo({
+        transactions.push(
+            Transaction({
                 transactionType: TransactionType.Staking,
                 amount: _amount,
                 time: block.timestamp,
-                paidOut: 0
+                paidOut: zero
             })
         );
 
         addUniqueUser(_pid);
 
-        pool.tokenInfo.collateralToken.mint(msg.sender, _amount);
+        pool.tokenInfo.reserve.mintCollateralToken(msg.sender, _amount);
 
         emit Deposited(msg.sender, _pid, _amount);
     }
 
     function withdraw(uint256 _pid, uint256 _index, uint256 _amount) public {
         PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo storage transaction = userInfo[_pid][msg.sender][_index];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+        Transaction storage transaction = user.transactions[_index];
 
         require(
             transaction.transactionType == TransactionType.Staking,
@@ -698,10 +876,12 @@ contract Staking is Ownable {
         if (pool.poolType == PoolType.Staking) {
             // Check if the user is withdrawing early
             require(pool.interestPayoutsStarted, INTEREST_PAYOUT_NOT_STARTED);
+            // require(block.timestamp > pool.depositLimiters.endTime, '')
             require(
                 block.timestamp >=
-                    pool.depositLimiters.endTime +
-                        pool.depositLimiters.duration,
+                    pool.depositLimiters.endTime.add(
+                        pool.depositLimiters.duration
+                    ),
                 'withdrawing too early'
             );
         } else {
@@ -710,17 +890,16 @@ contract Staking is Ownable {
                 'amount is currently utilised'
             );
 
-            (
-                uint256 projectedUtilisation,
-                uint256 precision
-            ) = calculatePercentage(
-                    pool.funds.loanedBalance,
-                    pool.funds.balance.sub(_amount)
-                );
+            uint256 projectedUtilisation = calculatePercentage(
+                pool.funds.loanedBalance,
+                pool.funds.balance.sub(_amount)
+            );
 
             require(
                 projectedUtilisation <=
-                    pool.depositLimiters.maxUtilisation.mul(precision),
+                    pool.depositLimiters.maxUtilisation.mul(
+                        percentagePrecision
+                    ),
                 'pool utilisation will max out if withdrawn'
             );
         }
@@ -728,9 +907,7 @@ contract Staking is Ownable {
         // Update user states
         transaction.amount = transaction.amount.sub(_amount);
         transaction.time = block.timestamp;
-        totalUserAmountStaked[_pid][msg.sender] = totalUserAmountStaked[_pid][
-            msg.sender
-        ].sub(_amount);
+        user.totalAmountStaked = user.totalAmountStaked.sub(_amount);
 
         uint256 _originalAmount = _amount;
 
@@ -748,7 +925,7 @@ contract Staking is Ownable {
         } else if (pool.poolType == PoolType.Loan) {
             // Add rewards to _amount with the ratio according to current interest paid
             _amount = _amount.mul(pool.funds.balance).div(
-                pool.tokenInfo.collateralToken.totalSupply()
+                pool.tokenInfo.reserve.totalSupply()
             );
         }
 
@@ -757,9 +934,9 @@ contract Staking is Ownable {
 
         deleteStakeIfEmpty(_pid, _index);
 
-        pool.tokenInfo.collateralToken.burn(msg.sender, _originalAmount);
+        pool.tokenInfo.reserve.burnCollateralToken(msg.sender, _originalAmount);
         pool.tokenInfo.token.safeTransferFrom(
-            address(pool.tokenInfo.collateralToken),
+            address(pool.tokenInfo.reserve),
             msg.sender,
             _amount
         );
@@ -769,41 +946,46 @@ contract Staking is Ownable {
 
     function deleteStakeIfEmpty(uint256 _pid, uint256 _index) private {
         PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo[] storage transactions = userInfo[_pid][msg.sender];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+        Transaction[] storage transactions = user.transactions;
 
-        if (transactions[_index].amount == 0) {
-            transactions[_index] = transactions[transactions.length - 1];
+        if (transactions[_index].amount == zero) {
+            if (_index != transactions.length.sub(one))
+                transactions[_index] = transactions[
+                    transactions.length.sub(one)
+                ];
+
             transactions.pop();
         }
 
-        if (transactions.length == 0) {
-            isAPoolUser[_pid][msg.sender] = false;
-            pool.uniqueUsers = pool.uniqueUsers.sub(1);
+        if (transactions.length == zero) {
+            user.isAPoolUser = false;
+            pool.uniqueUsers = pool.uniqueUsers.sub(one);
         }
     }
 
     function addUniqueUser(uint256 _pid) private {
         PoolInfo storage pool = poolInfoPrivate[_pid];
+        UserInfo storage user = userInfo[_pid][msg.sender];
 
-        if (!isAPoolUser[_pid][msg.sender]) {
-            pool.uniqueUsers = pool.uniqueUsers.add(1);
+        if (!user.isAPoolUser) {
+            user.isAPoolUser = true;
+            pool.uniqueUsers = pool.uniqueUsers.add(one);
         }
-
-        isAPoolUser[_pid][msg.sender] = true;
     }
 
     function calculatePercentage(
         uint256 _value,
         uint256 _of
-    ) public pure returns (uint256, uint256) {
-        uint256 precision = 1 ether;
+    ) private view returns (uint256) {
+        if (_of == zero) return zero;
 
-        // Special condition for division by zero
-        if (_of == 0) return (0, precision);
+        uint256 percentage = _value
+            .mul(oneHundred)
+            .mul(percentagePrecision)
+            .div(_of);
 
-        uint256 percentage = _value.mul(100).mul(precision).div(_of);
-
-        return (percentage, precision);
+        return percentage;
     }
 
     function transferRewards(
@@ -813,7 +995,8 @@ contract Staking is Ownable {
         uint256 _duration
     ) private returns (uint256 claimedRewards) {
         PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo storage transaction = userInfo[_pid][msg.sender][_index];
+        Transaction storage transaction = userInfo[_pid][msg.sender]
+            .transactions[_index];
 
         require(_amount <= transaction.amount, 'amount greater than available');
 
@@ -829,68 +1012,93 @@ contract Staking is Ownable {
         if (reward > transaction.paidOut) {
             reward = reward.sub(transaction.paidOut);
         } else {
-            reward = uint256(0);
+            reward = zero;
         }
 
-        transaction.paidOut = transaction.paidOut.add(reward);
-        pool.funds.balance = pool.funds.balance.sub(reward);
+        if (reward > zero) {
+            transaction.paidOut = transaction.paidOut.add(reward);
+            pool.funds.balance = pool.funds.balance.sub(reward);
 
-        pool.tokenInfo.token.safeTransferFrom(
-            address(pool.tokenInfo.collateralToken),
-            msg.sender,
-            reward
-        );
+            if (
+                shouldReserveResetAllowance(
+                    pool.tokenInfo.reserve,
+                    pool.tokenInfo.token,
+                    _amount
+                )
+            ) {
+                IReserve(address(pool.tokenInfo.reserve))
+                    .resetAllowance();
+            }
 
-        emit RewardHarvested(msg.sender, _pid, reward);
+            pool.tokenInfo.token.safeTransferFrom(
+                address(pool.tokenInfo.reserve),
+                msg.sender,
+                reward
+            );
+
+            emit RewardHarvested(msg.sender, _pid, reward);
+        }
 
         return reward;
     }
 
     function borrow(uint256 _pid, uint256 _amount) public {
-        require(isWhitelisted[_pid][msg.sender], 'Only whitelisted can borrow');
+        UserInfo storage user = userInfo[_pid][msg.sender];
+
+        require(user.isWhitelisted, 'Only whitelisted can borrow');
         require(
-            totalUserAmountStaked[_pid][msg.sender] == 0,
+            user.totalAmountStaked == zero,
             'Should withdraw all staked before borrowing'
         );
 
         PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo[] storage transactions = userInfo[_pid][msg.sender];
+        Transaction[] storage transactions = userInfo[_pid][msg.sender]
+            .transactions;
 
         require(pool.poolType == PoolType.Loan, 'no loans from here');
 
         require(!pool.paused, 'Pool Paused');
 
-        require(pool.funds.balance > 0, 'Nothing deposited');
+        require(pool.funds.balance > zero, 'Nothing deposited');
 
-        (uint256 projectedUtilisation, uint256 precision) = calculatePercentage(
+        uint256 projectedUtilisation = calculatePercentage(
             pool.funds.loanedBalance.add(_amount),
             pool.funds.balance
         );
 
         require(
             projectedUtilisation <=
-                pool.depositLimiters.maxUtilisation.mul(precision),
+                pool.depositLimiters.maxUtilisation.mul(percentagePrecision),
             'utilisation maxed out'
         );
 
+        if (
+            shouldReserveResetAllowance(
+                pool.tokenInfo.reserve,
+                pool.tokenInfo.token,
+                _amount
+            )
+        ) {
+            IReserve(address(pool.tokenInfo.reserve))
+                .resetAllowance();
+        }
+
         pool.tokenInfo.token.safeTransferFrom(
-            address(pool.tokenInfo.collateralToken),
+            address(pool.tokenInfo.reserve),
             msg.sender,
             _amount
         );
 
-        totalUserAmountBorrowed[_pid][msg.sender] = totalUserAmountBorrowed[
-            _pid
-        ][msg.sender].add(_amount);
+        user.totalAmountBorrowed = user.totalAmountBorrowed.add(_amount);
 
         pool.funds.loanedBalance = pool.funds.loanedBalance.add(_amount);
 
         transactions.push(
-            UserInfo({
+            Transaction({
                 transactionType: TransactionType.Borrow,
                 amount: _amount,
                 time: block.timestamp,
-                paidOut: 0
+                paidOut: zero
             })
         );
 
@@ -901,7 +1109,8 @@ contract Staking is Ownable {
 
     function repay(uint256 _pid, uint256 _index, uint256 _amount) public {
         PoolInfo storage pool = poolInfoPrivate[_pid];
-        UserInfo storage transaction = userInfo[_pid][msg.sender][_index];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+        Transaction storage transaction = user.transactions[_index];
 
         require(pool.poolType == PoolType.Loan, 'nothing borrowed from here');
         require(
@@ -926,21 +1135,19 @@ contract Staking is Ownable {
         transaction.amount = transaction.amount.sub(_amount);
         transaction.time = block.timestamp;
 
-        totalUserAmountBorrowed[_pid][msg.sender] = totalUserAmountBorrowed[
-            _pid
-        ][msg.sender].sub(_amount);
+        user.totalAmountBorrowed = user.totalAmountBorrowed.sub(_amount);
 
         pool.funds.loanedBalance = pool.funds.loanedBalance.sub(_amount);
 
         pool.tokenInfo.token.safeTransferFrom(
             msg.sender,
-            address(pool.tokenInfo.collateralToken),
+            address(pool.tokenInfo.reserve),
             _amount
         );
 
         pool.tokenInfo.token.safeTransferFrom(
             msg.sender,
-            address(pool.tokenInfo.collateralToken),
+            address(pool.tokenInfo.reserve),
             interest
         );
 
@@ -957,49 +1164,56 @@ contract Staking is Ownable {
         uint256 _duration
     ) public view returns (uint256) {
         PoolInfo memory pool = poolInfoPrivate[_pid];
-        UserInfo memory transaction = userInfo[_pid][_user][_index];
+        Transaction memory transaction = userInfo[_pid][_user].transactions[
+            _index
+        ];
 
         require(_amount <= transaction.amount, 'amount greater than available');
 
         if (pool.poolType == PoolType.Staking) {
             if (block.timestamp < pool.depositLimiters.endTime) {
                 // No pay outs earlier than deposits end time for poolType Staking
-                return 0;
+                return zero;
             }
         }
 
-        (uint256 utilisation, uint256 precision) = getPoolUtilisation(_pid);
+        uint256 utilisation = getPoolUtilisation(_pid);
 
         if (pool.poolType == PoolType.Staking) {
             // Ignore Utilisation for PoolType Staking (use 100%)
-            utilisation = uint256(100).mul(precision);
+            utilisation = oneHundred.mul(percentagePrecision);
         }
 
         // Context: APY is dependent on utilisation for poolType Loan. Max APY is reached on 100% utilisation
+        // Max. utilisation can also limit Max. APY, if the allowed utilisation is less than 100%
         return
             (_amount.mul(pool.APY).mul(utilisation).mul(_duration)).div(
-                uint256(100).mul(uint256(100)).mul(uint256(365 days)).mul(
-                    precision
-                )
+                oneHundred.mul(oneHundred).mul(oneYear).mul(percentagePrecision)
             );
     }
 
-    function getPoolUtilisation(
-        uint256 _pid
-    ) public view returns (uint256, uint256) {
+    function getPoolUtilisation(uint256 _pid) public view returns (uint256) {
         PoolInfo memory pool = poolInfoPrivate[_pid];
 
-        (uint256 utilisation, uint256 precision) = calculatePercentage(
+        uint256 utilisation = calculatePercentage(
             pool.funds.loanedBalance,
             pool.funds.balance
         );
 
-        return (utilisation, precision);
+        return utilisation;
+    }
+
+    function getUserInfo(
+        uint256 _pid,
+        address _user
+    ) external view returns (UserInfo memory) {
+        return userInfo[_pid][_user];
     }
 
     function claimQuarterlyPayout(uint256 _pid, uint256 _index) external {
         PoolInfo memory pool = poolInfoPrivate[_pid];
-        UserInfo memory transaction = userInfo[_pid][msg.sender][_index];
+        Transaction memory transaction = userInfo[_pid][msg.sender]
+            .transactions[_index];
 
         require(
             pool.poolType == PoolType.Staking,
@@ -1013,17 +1227,17 @@ contract Staking is Ownable {
             INTEREST_PAYOUT_NOT_STARTED
         );
 
-        uint256 _duration = block.timestamp - pool.depositLimiters.endTime;
+        uint256 _duration = block.timestamp.sub(pool.depositLimiters.endTime);
 
         if (_duration > pool.depositLimiters.duration) {
             _duration = pool.depositLimiters.duration;
         }
 
-        uint256 quartersPassed = (_duration).div(90 days);
+        uint256 quartersPassed = (_duration).div(ninetyDays);
 
-        require(quartersPassed > 0, 'too early');
+        require(quartersPassed > zero, 'too early');
 
-        _duration = quartersPassed.mul(90 days);
+        _duration = quartersPassed.mul(ninetyDays);
 
         transferRewards(_pid, _index, transaction.amount, _duration);
     }
@@ -1034,10 +1248,11 @@ contract Staking is Ownable {
         bool _status
     ) external onlyOwner {
         PoolInfo storage pool = poolInfoPrivate[_pid];
+        UserInfo storage user = userInfo[_pid][_user];
 
         require(pool.poolType == PoolType.Loan, 'no loans from here');
 
-        isWhitelisted[_pid][_user] = _status;
+        user.isWhitelisted = _status;
 
         emit Whitelisted(_user, _pid, _status);
     }
@@ -1050,13 +1265,13 @@ contract Staking is Ownable {
                 'end time should be after start time'
             );
         } else {
-            _poolInfo.depositLimiters.startTime = 0;
-            _poolInfo.depositLimiters.endTime = 0;
+            _poolInfo.depositLimiters.startTime = zero;
+            _poolInfo.depositLimiters.endTime = zero;
         }
 
-        _poolInfo.funds.balance = 0;
-        _poolInfo.funds.loanedBalance = 0;
-        _poolInfo.uniqueUsers = 0;
+        _poolInfo.funds.balance = zero;
+        _poolInfo.funds.loanedBalance = zero;
+        _poolInfo.uniqueUsers = zero;
         _poolInfo.interestPayoutsStarted = false;
 
         require(
@@ -1064,13 +1279,13 @@ contract Staking is Ownable {
             'Utilisation can be maximum 100%'
         );
 
-        address _collateralToken = collateralTokenDeployer.createToken(
+        address _reserve = reserveDeployer.createReserve(
             address(this),
             address(_poolInfo.tokenInfo.token),
             _poolInfo.tokenInfo.token.decimals()
         );
 
-        _poolInfo.tokenInfo.collateralToken = IBEP20(_collateralToken);
+        _poolInfo.tokenInfo.reserve = IBEP20SupplyControl(_reserve);
 
         poolInfoPrivate.push(_poolInfo);
     }
@@ -1086,7 +1301,7 @@ contract Staking is Ownable {
         _newPoolInfo.funds.loanedBalance = pool.funds.loanedBalance;
         _newPoolInfo.uniqueUsers = pool.uniqueUsers;
         _newPoolInfo.tokenInfo.token = pool.tokenInfo.token;
-        _newPoolInfo.tokenInfo.collateralToken = pool.tokenInfo.collateralToken;
+        _newPoolInfo.tokenInfo.reserve = pool.tokenInfo.reserve;
         _newPoolInfo.poolType = pool.poolType;
 
         // Check utilisation
@@ -1095,13 +1310,12 @@ contract Staking is Ownable {
             'maxUtilisation cannot exceed 100%'
         );
 
-        (uint256 currentUtilisation, uint256 precision) = getPoolUtilisation(
-            _pid
-        );
+        uint256 currentUtilisation = getPoolUtilisation(_pid);
 
         require(
-            _newPoolInfo.depositLimiters.maxUtilisation.mul(precision) >=
-                currentUtilisation,
+            _newPoolInfo.depositLimiters.maxUtilisation.mul(
+                percentagePrecision
+            ) >= currentUtilisation,
             'should not set maxUtilisation less than current utilisation'
         );
 
@@ -1113,9 +1327,10 @@ contract Staking is Ownable {
         uint256 _from,
         uint256 _to
     ) external view returns (PoolInfo[] memory) {
-        PoolInfo[] memory tPoolInfo = new PoolInfo[](_to - _from + 1);
+        PoolInfo[] memory tPoolInfo = new PoolInfo[](_to.sub(_from).add(one));
 
-        uint256 j = 0;
+        uint256 j = zero;
+
         for (uint256 i = _from; i <= _to; i++) {
             PoolInfo memory _poolInfoPrivate = poolInfoPrivate[i];
             _poolInfoPrivate.tokenInfo.symbol = _poolInfoPrivate
@@ -1132,11 +1347,13 @@ contract Staking is Ownable {
         return tPoolInfo;
     }
 
-    function totalStakesOfUser(
+    function totalTransactionsOfUser(
         uint256 _pid,
         address _user
     ) external view returns (uint256) {
-        return userInfo[_pid][_user].length;
+        Transaction[] memory transactions = userInfo[_pid][_user].transactions;
+
+        return transactions.length;
     }
 
     function getUserStakes(
@@ -1144,69 +1361,35 @@ contract Staking is Ownable {
         address _user,
         uint256 _from,
         uint256 _to
-    ) external view returns (UserInfo[] memory) {
-        UserInfo[] memory tUserInfo = new UserInfo[](_to - _from + 1);
+    ) external view returns (Transaction[] memory) {
+        Transaction[] memory tUserInfo = new Transaction[](
+            _to.sub(_from).add(one)
+        );
+        Transaction[] memory transactions = userInfo[_pid][_user].transactions;
 
-        uint256 j = 0;
+        uint256 j = zero;
+
         for (uint256 i = _from; i <= _to; i++) {
-            tUserInfo[j++] = userInfo[_pid][_user][i];
+            tUserInfo[j++] = transactions[i];
         }
 
         return tUserInfo;
     }
 
-    function recoverFunds(
-        address _token,
-        address _to,
-        uint256 _amount
-    ) external onlyOwner returns (bool) {
-        if (_token == address(0)) {
-            payable(_to).transfer(_amount);
-            return true;
-        }
-
-        IBEP20(_token).safeTransfer(_to, _amount);
-
-        emit Recovered(_token, _to, _amount);
-
-        return true;
-    }
-
-    function recoverFundsFromCollateral(
-        address _collateralToken,
-        address _token,
-        address _to,
-        uint256 _amount
-    ) external onlyOwner returns (bool) {
-        if (_token == address(0)) {
-            ICollateralToken(_collateralToken).recoverEther(_to, _amount);
-            return true;
-        }
-
-        IBEP20(_token).safeTransferFrom(_collateralToken, _to, _amount);
-
-        emit Recovered(_token, _to, _amount);
-
-        return true;
-    }
-
-    receive() external payable {
-        emit ReceivedBNB(msg.sender, msg.value);
-    }
-
     // Events
     event Deposited(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdrawn(address indexed user, uint256 indexed pid, uint256 amount);
+
     event RewardHarvested(
         address indexed user,
         uint256 indexed pid,
         uint256 amount
     );
 
+    event PoolPaused(uint256 indexed _pid, bool _flag);
+
     event Whitelisted(address indexed user, uint256 indexed pid, bool status);
+
     event Borrowed(address indexed user, uint256 indexed pid, uint256 amount);
     event Repaid(address indexed user, uint256 indexed pid, uint256 amount);
-
-    event Recovered(address token, address to, uint256 amount);
-    event ReceivedBNB(address, uint256);
 }
