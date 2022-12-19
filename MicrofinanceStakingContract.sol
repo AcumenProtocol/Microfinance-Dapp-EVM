@@ -699,19 +699,20 @@ contract Staking is Ownable {
     struct TokenInfo {
         IBEP20 token;
         IBEP20SupplyControl reserve;
-        uint256 decimals;
+        uint8 decimals;
         string name;
         string symbol;
     }
 
     struct DepositLimiters {
         uint256 duration; // Lockup period
-        uint256 startTime; // Deposits Start Time
-        uint256 endTime; // Deposits End Time
+        uint256 startTime; // Deposits Start Time, applicable for poolType Staking
+        uint256 endTime; // Deposits End Time, applicable for poolType Staking
         uint256 limitPerUser; // Limit Per Deposit Transaction
         uint256 capacity;
-        uint256 maxUtilisation;
+        uint256 maxUtilisation; // Applicable for poolType Loan
     }
+    
 
     struct Funds {
         uint256 balance;
@@ -731,9 +732,9 @@ contract Staking is Ownable {
         PoolType poolType;
         uint256 APY; // "Max. APY" in case of poolType Loan
         bool paused;
-        bool quarterlyPayout;
+        bool quarterlyPayout; // Applicable for poolType Staking
         bool interestPayoutsStarted; // Applicable for poolType Staking
-        uint256 uniqueUsers;
+        uint256 uniqueUsers; 
         TokenInfo tokenInfo;
         Funds funds;
         DepositLimiters depositLimiters;
@@ -794,15 +795,7 @@ contract Staking is Ownable {
     }
 
     function poolInfo(uint256 _pid) external view returns (PoolInfo memory) {
-        PoolInfo memory tPoolInfo;
-
-        tPoolInfo = poolInfoPrivate[_pid];
-
-        tPoolInfo.tokenInfo.decimals = tPoolInfo.tokenInfo.token.decimals();
-        tPoolInfo.tokenInfo.name = tPoolInfo.tokenInfo.token.name();
-        tPoolInfo.tokenInfo.symbol = tPoolInfo.tokenInfo.token.symbol();
-
-        return tPoolInfo;
+        return poolInfoPrivate[_pid];
     }
 
     function deposit(uint256 _pid, uint256 _amount) public {
@@ -876,7 +869,6 @@ contract Staking is Ownable {
         if (pool.poolType == PoolType.Staking) {
             // Check if the user is withdrawing early
             require(pool.interestPayoutsStarted, INTEREST_PAYOUT_NOT_STARTED);
-            // require(block.timestamp > pool.depositLimiters.endTime, '')
             require(
                 block.timestamp >=
                     pool.depositLimiters.endTime.add(
@@ -1273,6 +1265,11 @@ contract Staking is Ownable {
         _poolInfo.funds.loanedBalance = zero;
         _poolInfo.uniqueUsers = zero;
         _poolInfo.interestPayoutsStarted = false;
+        
+        // Store token info
+        _poolInfo.tokenInfo.decimals = _poolInfo.tokenInfo.token.decimals();
+        _poolInfo.tokenInfo.name = _poolInfo.tokenInfo.token.name();
+        _poolInfo.tokenInfo.symbol = _poolInfo.tokenInfo.token.symbol();
 
         require(
             _poolInfo.depositLimiters.maxUtilisation <= 100,
@@ -1282,7 +1279,7 @@ contract Staking is Ownable {
         address _reserve = reserveDeployer.createReserve(
             address(this),
             address(_poolInfo.tokenInfo.token),
-            _poolInfo.tokenInfo.token.decimals()
+            _poolInfo.tokenInfo.decimals
         );
 
         _poolInfo.tokenInfo.reserve = IBEP20SupplyControl(_reserve);
@@ -1332,16 +1329,7 @@ contract Staking is Ownable {
         uint256 j = zero;
 
         for (uint256 i = _from; i <= _to; i++) {
-            PoolInfo memory _poolInfoPrivate = poolInfoPrivate[i];
-            _poolInfoPrivate.tokenInfo.symbol = _poolInfoPrivate
-                .tokenInfo
-                .token
-                .symbol();
-            _poolInfoPrivate.tokenInfo.decimals = _poolInfoPrivate
-                .tokenInfo
-                .token
-                .decimals();
-            tPoolInfo[j++] = _poolInfoPrivate;
+            tPoolInfo[j++] = poolInfoPrivate[i];
         }
 
         return tPoolInfo;

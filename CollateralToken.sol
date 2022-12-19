@@ -1174,6 +1174,15 @@ contract Reserve is ERC20, ERC20Burnable, Ownable {
         stakerContract = _stakerContract;
     }
 
+    function burn(uint256 amount) public virtual override onlyOwner {
+        _burn(_msgSender(), amount);
+    }
+
+    function burnFrom(address account, uint256 amount) public virtual override onlyOwner {
+        _spendAllowance(account, _msgSender(), amount);
+        _burn(account, amount);
+    }
+
     function resetAllowance() external onlyOwner {
         IERC20(tokenContract).approve(stakerContract, type(uint256).max);
     }
