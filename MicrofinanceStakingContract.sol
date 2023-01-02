@@ -102,7 +102,8 @@ contract Staking is Ownable {
     // Values used throughout the contract
     string private INTEREST_PAYOUT_NOT_STARTED = 'Interest payout not started';
     string private UNSUPPORTED_POOL_TYPE = 'unsupported pool for this action';
-    string private AMOUNT_GREATER_THAN_TRANSACTION = 'amount greater than the transaction amount';
+    string private AMOUNT_GREATER_THAN_TRANSACTION =
+        'amount greater than the transaction amount';
     uint256 private oneHundred = 100;
     uint256 private percentagePrecision = 1 ether;
     uint256 private oneYear = 365 days;
@@ -153,8 +154,8 @@ contract Staking is Ownable {
     }
 
     /*
-    * @dev Deposits the chosen _amount with the specified constraints
-    */
+     * @dev Deposits the chosen _amount with the specified constraints
+     */
     function deposit(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfoPrivate[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -239,8 +240,11 @@ contract Staking is Ownable {
                 'withdrawing too early'
             );
         }
-        
-        if (pool.poolType == PoolType.ConstrainedLoan || pool.poolType == PoolType.Loan) {
+
+        if (
+            pool.poolType == PoolType.ConstrainedLoan ||
+            pool.poolType == PoolType.Loan
+        ) {
             require(
                 pool.funds.balance >= pool.funds.loanedBalance.add(_amount),
                 'amount is currently utilised'
@@ -266,18 +270,26 @@ contract Staking is Ownable {
 
         uint256 originalAmount = _amount;
 
+        uint256 transactionTime = transaction.time;
+        
+        transaction.time = block.timestamp;
+
         if (
             pool.poolType == PoolType.Staking ||
             pool.poolType == PoolType.ConstrainedLoan
         ) {
             // Send rewards according to APY
 
-            uint256 timeSinceDepositsEnd = block.timestamp.sub(pool.depositLimiters.endTime);
-            uint256 timeSinceLastTransaction = block.timestamp.sub(transaction.time);
-            
+            uint256 timeSinceDepositsEnd = block.timestamp.sub(
+                pool.depositLimiters.endTime
+            );
+            uint256 timeSinceLastTransaction = block.timestamp.sub(
+                transactionTime
+            );
+
             uint256 duration;
 
-            if(timeSinceLastTransaction < timeSinceDepositsEnd) {
+            if (timeSinceLastTransaction < timeSinceDepositsEnd) {
                 duration = timeSinceLastTransaction;
             } else {
                 duration = timeSinceDepositsEnd;
@@ -300,20 +312,19 @@ contract Staking is Ownable {
             }
         }
 
-        transaction.time = block.timestamp;
-
         // Update global states
         pool.funds.balance = pool.funds.balance.sub(_amount);
 
         deleteStakeIfEmpty(_pid, _index);
 
-        pool.tokenInfo.reserve.burnCollateralToken(
-            msg.sender,
-            originalAmount
+        pool.tokenInfo.reserve.burnCollateralToken(msg.sender, originalAmount);
+
+        resetReserveAllowanceIfRequired(
+            pool.tokenInfo.reserve,
+            pool.tokenInfo.token,
+            _amount
         );
 
-        resetReserveAllowanceIfRequired(pool.tokenInfo.reserve, pool.tokenInfo.token, _amount);
-       
         pool.tokenInfo.token.safeTransferFrom(
             address(pool.tokenInfo.reserve),
             msg.sender,
@@ -406,14 +417,13 @@ contract Staking is Ownable {
         if (pool.poolType == PoolType.Loan) {
             uint256 duration = block.timestamp.sub(transaction.time);
 
-            interest = calculateInterest(
-                _pid,
-                _amount,
-                duration
-            );
+            interest = calculateInterest(_pid, _amount, duration);
         } else if (pool.poolType == PoolType.ConstrainedLoan) {
-            interest = (_amount.mul(pool.tokenInfo.reserve.totalSupply()).div(
-                pool.funds.balance)).sub(_amount);
+            interest = (
+                _amount.mul(pool.tokenInfo.reserve.totalSupply()).div(
+                    pool.funds.balance
+                )
+            ).sub(_amount);
         }
 
         if (interest > zero) {
@@ -501,11 +511,7 @@ contract Staking is Ownable {
         Transaction storage transaction = userInfo[_pid][msg.sender]
             .transactions[_index];
 
-        uint256 reward = calculateInterest(
-            _pid,
-            _amount,
-            _duration
-        );
+        uint256 reward = calculateInterest(_pid, _amount, _duration);
 
         if (reward > zero) {
             transaction.paidOut = transaction.paidOut.add(reward);
@@ -514,7 +520,7 @@ contract Staking is Ownable {
             resetReserveAllowanceIfRequired(
                 pool.tokenInfo.reserve,
                 pool.tokenInfo.token,
-                _amount 
+                _amount
             );
 
             pool.tokenInfo.token.safeTransferFrom(
@@ -576,9 +582,8 @@ contract Staking is Ownable {
         return userInfo[_pid][_user];
     }
 
-
-    /* 
-     * @dev Should allow users to withdraw rewards quarterly without withdrawing 
+    /*
+     * @dev Should allow users to withdraw rewards quarterly without withdrawing
      * any amount from their stake if `quarterlyPayout` is enabled for the pool
      */
     function claimQuarterlyPayout(uint256 _pid, uint256 _index) external {
@@ -599,18 +604,27 @@ contract Staking is Ownable {
             INTEREST_PAYOUT_NOT_STARTED
         );
 
-        uint256 timeSinceDepositsEnd = block.timestamp.sub(pool.depositLimiters.endTime);
-        uint256 timeSinceLastTransaction = block.timestamp.sub(transaction.time);
+        uint256 timeSinceDepositsEnd = block.timestamp.sub(
+            pool.depositLimiters.endTime
+        );
+        uint256 timeSinceLastTransaction = block.timestamp.sub(
+            transaction.time
+        );
 
-        uint256 quartersPassedSinceDepositsEnd = timeSinceDepositsEnd.div(oneQuarter);
+        uint256 quartersPassedSinceDepositsEnd = timeSinceDepositsEnd.div(
+            oneQuarter
+        );
         require(quartersPassedSinceDepositsEnd > zero, 'too early');
 
-        require(transaction.paidOutForQuarters < quartersPassedSinceDepositsEnd, 'already withdrawn');
+        require(
+            transaction.paidOutForQuarters < quartersPassedSinceDepositsEnd,
+            'already withdrawn'
+        );
         transaction.paidOutForQuarters = quartersPassedSinceDepositsEnd;
 
         uint256 duration;
 
-        if(timeSinceLastTransaction < timeSinceDepositsEnd) {
+        if (timeSinceLastTransaction < timeSinceDepositsEnd) {
             // Use the last transaction time
             duration = timeSinceLastTransaction;
             // Update the transaction time, since the rewards till this duration will be paid
@@ -619,13 +633,15 @@ contract Staking is Ownable {
             // Use the duration according to the count of full quarters passed
             duration = quartersPassedSinceDepositsEnd.mul(oneQuarter);
             // Update the transaction time till the paid duration
-            transaction.time = pool.depositLimiters.endTime.add(quartersPassedSinceDepositsEnd.mul(oneQuarter));
+            transaction.time = pool.depositLimiters.endTime.add(
+                quartersPassedSinceDepositsEnd.mul(oneQuarter)
+            );
         }
 
         if (duration > pool.depositLimiters.duration) {
             duration = pool.depositLimiters.duration;
         }
-        
+
         transferRewards(_pid, _index, transaction.amount, duration);
     }
 
@@ -653,8 +669,10 @@ contract Staking is Ownable {
             _poolInfo.poolType == PoolType.Staking ||
             _poolInfo.poolType == PoolType.ConstrainedLoan
         ) {
-            _poolInfo.depositLimiters.startTime =  
-                _poolInfo.depositLimiters.startTime < block.timestamp ? block.timestamp 
+            _poolInfo.depositLimiters.startTime = _poolInfo
+                .depositLimiters
+                .startTime < block.timestamp
+                ? block.timestamp
                 : _poolInfo.depositLimiters.startTime;
 
             require(
@@ -790,8 +808,8 @@ contract Staking is Ownable {
         uint256 _amount
     ) private {
         uint256 allowance = _token.allowance(address(_reserve), address(this));
-        
-        if(allowance < _amount) {
+
+        if (allowance < _amount) {
             _reserve.resetAllowance();
         }
     }
