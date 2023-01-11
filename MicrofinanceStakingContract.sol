@@ -106,6 +106,7 @@ contract Staking is Ownable {
         'amount greater than the transaction amount';
     uint256 private oneHundred = 100;
     uint256 private percentagePrecision = 1 ether;
+    uint256 private apyPrecision = 1 ether;
     uint256 private oneYear = 365 days;
     uint256 private oneQuarter = 90 days;
     uint256 private zero = 0;
@@ -271,7 +272,7 @@ contract Staking is Ownable {
         uint256 originalAmount = _amount;
 
         uint256 transactionTime = transaction.time;
-        
+
         transaction.time = block.timestamp;
 
         if (
@@ -556,7 +557,11 @@ contract Staking is Ownable {
 
         return
             (_amount.mul(pool.APY).mul(utilisation).mul(_duration)).div(
-                oneHundred.mul(oneHundred).mul(oneYear).mul(percentagePrecision)
+                oneHundred
+                    .mul(oneHundred)
+                    .mul(oneYear)
+                    .mul(percentagePrecision)
+                    .mul(apyPrecision)
             );
     }
 
