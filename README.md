@@ -3,6 +3,9 @@
 
 The acumen micro finance dapp bridges crypto and traditional finance allowing DeFi users to earn an attractive, stable, and uncorrelated yield while engendering an equitable environment where Small and Medium size Enterprises(SMEs) and entrepreneurs can prosper.
 
+Audited By Omniscia
+
+https://omniscia.io/reports/acumen-staking-token-system/
 
 ## Documentation
 
