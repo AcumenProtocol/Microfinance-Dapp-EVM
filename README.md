@@ -1,7 +1,7 @@
 
-# Acumen Microfinance Dapp
+# Acumen Stabledapp
 
-The acumen micro finance dapp bridges crypto and traditional finance allowing DeFi users to earn an attractive, stable, and uncorrelated yield while engendering an equitable environment where Small and Medium size Enterprises(SMEs) and entrepreneurs can prosper.
+Acumen Stabledapp connects DeFi and TradFi in a regulatory compliant manner transforming emerging capital markets. Acumen is growing the overall DeFi ecosystem by tokenizing Real World Assets (RWA) bringing the significant benefits of tokenization to TradFi. The Acumen protocol acts as a bridge connecting TradFi with DeFi, and opens up a new asset class with attractive stable uncorrelated yield to traditional DeFi participants.
 
 Audited By Omniscia
 
@@ -9,19 +9,15 @@ https://omniscia.io/reports/acumen-staking-token-system/
 
 ## Documentation
 
-[Documentation](docs.acumen.network/)
+https://docs.acumen.network/general/introduction
 
 
-## Demo
+## Website
 
 https://acumen.network
 
 
-
-![App Screenshot](https://pbs.twimg.com/media/FmC6nnNXEA05TNO?format=jpg&name=small)
-
-
 ## Support
 
-For support, please join our Telegram t.me/AcumenOfficial 
+For support, please join our Discord https://discord.com/invite/yAjWTM6xRj
 
